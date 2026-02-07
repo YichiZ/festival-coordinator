@@ -1,9 +1,20 @@
 [project]
-name = "festival-coordinator"
+name = "voice-agent-researcher"
 version = "0.1.0"
-requires-python = ">=3.10"
+description = "Voice agent researcher"
+requires-python = ">=3.12"
 dependencies = [
-    "cartesia-line>=0.2.2",
-    "loguru>=0.7.3",
-    "python-dotenv>=1.2.1",
+    "pipecat-ai[webrtc,anthropic,daily,silero,cartesia,local-smart-turn-v3,runner]",
+    "pipecat-ai-cli"
 ]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.404,<2",
+    "ruff>=0.12.11,<1",
+]
+
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["I"]

@@ -1,1 +1,0 @@
-1. Make sure that github integrate with Cartesia. 
