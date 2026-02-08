@@ -1,4 +1,7 @@
+import json
 import os
+import tempfile
+from datetime import datetime
 from dotenv import load_dotenv
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
@@ -13,6 +16,8 @@ from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
+    UserTurnStoppedMessage,
+    AssistantTurnStoppedMessage,
 )
 from pipecat.turns.user_stop.turn_analyzer_user_turn_stop_strategy import (
     TurnAnalyzerUserTurnStopStrategy,
@@ -31,10 +36,29 @@ from pipecat.frames.frames import LLMRunFrame
 
 from loguru import logger
 
+from tools import create_tools, summarize_transcript
+import db
+
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from pipecat.utils.tracing.setup import setup_tracing
+
 load_dotenv(override=True)
 
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 CARTESIA_API_KEY = os.environ["CARTESIA_API_KEY"]
+IS_TRACING_ENABLED = bool(os.environ["ENABLE_TRACING"])
+
+# Initialize tracing if enabled
+if IS_TRACING_ENABLED:
+    # Create the exporter
+    otlp_exporter = OTLPSpanExporter()
+
+    # Set up tracing with the exporter
+    setup_tracing(
+        service_name="pipecat-demo",
+        exporter=otlp_exporter,
+    )
+    logger.info("OpenTelemetry tracing initialized")
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -44,7 +68,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tts = CartesiaTTSService(
         api_key=CARTESIA_API_KEY,
-        voice_id="6ccbfb76-1fc6-48f7-b71d-91ac6298247b", # Tessa, kind and compassionate
+        voice_id="6ccbfb76-1fc6-48f7-b71d-91ac6298247b",  # Tessa, kind and compassionate
         text_filter=MarkdownTextFilter(),
     )
 
@@ -52,6 +76,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         api_key=ANTHROPIC_API_KEY,
         model="claude-haiku-4-5-20251001",
     )
+
+    # --- Session state & tools ---
+    session_state: dict = {"group_id": None, "call_id": None}
+    transcript_log: list[dict] = []
+    tools = create_tools(session_state)
+
+    # Context. Should have the phone and the group, for the context.
 
     messages = [
         {
@@ -75,11 +106,24 @@ Conversation style:
 - When comparing options, give a quick bottom line recommendation with reasoning.
 - Use real approximate numbers when discussing costs so people can make decisions.
 
-Start by learning the basics: who's in the group, where everyone is based, and what festivals or artists they're interested in.""",
+Start by learning the basics: who's in the group, where everyone is based, and what festivals or artists they're interested in.
+
+Tools:
+- save_group: Call early in the conversation once you know the group name. This creates the planning group and starts tracking the session.
+- save_member: Save each friend to the group as you learn their name and city. Call once per person.
+- save_festival: Save a festival when the group starts discussing one seriously. Include as much detail as you know (dates, location, price, on-sale date).
+- save_artist: Save artists to a festival after it's been saved. Use the festival_id from save_festival.
+- get_group_info: Retrieve all saved data for the current group (members, festivals, artists, past call summaries). Use at the start of a returning session or when you need to reference what's been saved.
+- end_call: Use when the conversation has clearly concluded—the user says goodbye, thanks, that's all, etc.
+  Process: First say a natural goodbye like "Take care!" or "Nice chatting with you!", then call end_call.
+  Never use for brief pauses or "hold on" moments.
+
+Important: Proactively save information as you learn it during the conversation. Don't wait to be asked — if someone mentions a friend's name and city, save it. If they mention a festival, save it. This ensures nothing is lost between calls.""",
+    
         }
     ]
 
-    context = LLMContext(messages)
+    context = LLMContext(messages, tools=tools)  # type: ignore[arg-type]
 
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
@@ -113,20 +157,60 @@ Start by learning the basics: who's in the group, where everyone is based, and w
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
+        enable_tracing=IS_TRACING_ENABLED,
     )
+
+    # --- Transcript collection via turn events ---
+
+    @user_aggregator.event_handler("on_user_turn_stopped")
+    async def on_user_turn_stopped(aggregator, strategy, message: UserTurnStoppedMessage):
+        transcript_log.append({
+            "role": "user",
+            "content": message.content,
+            "timestamp": message.timestamp,
+        })
+
+    @assistant_aggregator.event_handler("on_assistant_turn_stopped")
+    async def on_assistant_turn_stopped(aggregator, message: AssistantTurnStoppedMessage):
+        transcript_log.append({
+            "role": "assistant",
+            "content": message.content,
+            "timestamp": message.timestamp,
+        })
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
 
         messages.append(
-            {"role": "system", "content": "Greet the user warmly, introduce yourself as Sophie, and ask who's in the crew and what festivals or artists they're excited about this year."}
+            {"role": "system", "content": "Greet the user warmly, introduce yourself as Sophie and that ."}
         )
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
+
+        # Save full transcript to temp folder for debugging
+        if transcript_log:
+            tmp_dir = os.path.join(tempfile.gettempdir(), "festival-coordinator")
+            os.makedirs(tmp_dir, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            transcript_path = os.path.join(tmp_dir, f"transcript_{ts}.json")
+            with open(transcript_path, "w") as f:
+                json.dump(transcript_log, f, indent=2, default=str)
+            logger.info(f"Saved transcript to {transcript_path}")
+
+        # Post-call: summarize and save transcript + summary to DB
+        call_id = session_state.get("call_id")
+        if call_id:
+            try:
+                summary = await summarize_transcript(transcript_log)
+                db.end_call_record(call_id, summary, transcript=transcript_log)
+                logger.info(f"Saved call summary for call {call_id}")
+            except Exception as e:
+                logger.error(f"Failed to save call summary: {e}")
+
         await task.cancel()
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
