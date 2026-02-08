@@ -9,6 +9,7 @@ dependencies = [
     "supabase",
     "pipecatcloud>=0.2.19",
     "opentelemetry-exporter-otlp-proto-http",
+    "fastapi[standard]",
 ]
 
 [dependency-groups]
