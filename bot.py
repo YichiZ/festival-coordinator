@@ -32,7 +32,7 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 
-from pipecat.frames.frames import LLMRunFrame
+from pipecat.frames.frames import LLMRunFrame, TTSSpeakFrame
 
 from loguru import logger
 
@@ -41,6 +41,7 @@ import db
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from pipecat.utils.tracing.setup import setup_tracing
+from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 
 load_dotenv(override=True)
 
@@ -68,7 +69,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     tts = CartesiaTTSService(
         api_key=CARTESIA_API_KEY,
-        voice_id="6ccbfb76-1fc6-48f7-b71d-91ac6298247b",  # Tessa, kind and compassionate
+        # voice_id="6ccbfb76-1fc6-48f7-b71d-91ac6298247b",  # Tessa, kind and compassionate
+        voice_id="2ba1dbaa-d52b-4984-8bc5-f877e9b03a02", # Yichi
         text_filter=MarkdownTextFilter(),
     )
 
@@ -77,48 +79,35 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         model="claude-haiku-4-5-20251001",
     )
 
+    import random
+
+    _filler_phrases = [
+        "Hold on a sec.",
+        "Let me check on that.",
+        "One moment.",
+        "Looking that up.",
+        "On it.",
+    ]
+
+    @llm.event_handler("on_function_calls_started")
+    async def on_function_calls_started(service, function_calls):
+        await tts.queue_frame(TTSSpeakFrame(random.choice(_filler_phrases)))
+
     # --- Session state & tools ---
     session_state: dict = {"group_id": None, "call_id": None}
     transcript_log: list[dict] = []
-    tools = create_tools(session_state)
+    tools = create_tools(session_state, llm=llm)
 
     # Context. Should have the phone and the group, for the context.
 
     messages = [
         {
             "role": "system",
-            "content": """You are Sophie, a friendly and organized festival trip coordinator. You help groups of friends plan festival trips together, even when everyone lives in different cities and life is busy.
+            "content": """You are Yichi. You're on a voice call helping a group of friends figure out which festivals to hit, when to buy tickets, and how to get everyone there without it being a logistical nightmare.
 
-Your job is to make the planning process frictionless. You help with:
+Talk like an excited friend who loves festivals. Keep it short and hype — you're on a call, not writing an email. Ask one or two things at a time.
 
-- Choosing which festivals to attend (lineups, dates, vibes, budget fit)
-- Figuring out the best time to buy tickets (presales, on-sale dates, price tiers, resale tips)
-- Estimating total trip costs per person (tickets, flights, accommodation, rental cars, food)
-- Coordinating travel logistics from multiple cities (flights, carpools, rental cars)
-- Finding the best group accommodation options near the venue
-- Keeping track of who's in, who's on the fence, and what everyone's availability looks like
-
-Conversation style:
-- Keep responses concise and conversational since you're speaking out loud, not writing an essay.
-- Be warm, upbeat, and practical. You're the friend who's great at planning.
-- Ask 1 to 2 questions at a time to keep the conversation flowing naturally.
-- Proactively suggest next steps so things keep moving forward.
-- When comparing options, give a quick bottom line recommendation with reasoning.
-- Use real approximate numbers when discussing costs so people can make decisions.
-
-Start by learning the basics: who's in the group, where everyone is based, and what festivals or artists they're interested in.
-
-Tools:
-- save_group: Call early in the conversation once you know the group name. This creates the planning group and starts tracking the session.
-- save_member: Save each friend to the group as you learn their name and city. Call once per person.
-- save_festival: Save a festival when the group starts discussing one seriously. Include as much detail as you know (dates, location, price, on-sale date).
-- save_artist: Save artists to a festival after it's been saved. Use the festival_id from save_festival.
-- get_group_info: Retrieve all saved data for the current group (members, festivals, artists, past call summaries). Use at the start of a returning session or when you need to reference what's been saved.
-- end_call: Use when the conversation has clearly concluded—the user says goodbye, thanks, that's all, etc.
-  Process: First say a natural goodbye like "Take care!" or "Nice chatting with you!", then call end_call.
-  Never use for brief pauses or "hold on" moments.
-
-Important: Proactively save information as you learn it during the conversation. Don't wait to be asked — if someone mentions a friend's name and city, save it. If they mention a festival, save it. This ensures nothing is lost between calls.""",
+Early on, suggest a fun group name and ask if they're into it. Once they confirm, call save_group. Save other info (names, cities, festivals, artists) as it comes up, but check with the caller before saving. When the convo wraps up (goodbyes, "that's all," etc.), say something casual like "later!" then call end_call.""",
     
         }
     ]
@@ -183,7 +172,7 @@ Important: Proactively save information as you learn it during the conversation.
         logger.info("Client connected")
 
         messages.append(
-            {"role": "system", "content": "Greet the user warmly, introduce yourself as Sophie and that ."}
+            {"role": "system", "content": "Greet the user warmly, introduce yourself as Yichi and that you're excited to help plan the trip. Keep it to one to two sentences."}
         )
         await task.queue_frames([LLMRunFrame()])
 
@@ -221,6 +210,8 @@ Important: Proactively save information as you learn it during the conversation.
 async def bot(runner_args: RunnerArguments):
     """Main bot entry point for the bot starter."""
 
+    logger.info(f"Runner arguments: {runner_args}")
+
     transport_params = {
         "daily": lambda: DailyParams(
             audio_in_enabled=True,
@@ -229,6 +220,11 @@ async def bot(runner_args: RunnerArguments):
         "webrtc": lambda: TransportParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
+        ),
+        "twilio": lambda: FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(),
         ),
     }
 

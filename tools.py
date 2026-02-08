@@ -51,8 +51,11 @@ async def summarize_transcript(messages: list) -> str:
     return response.content[0].text  # type: ignore[union-attr]
 
 
-def create_tools(session_state: dict) -> ToolsSchema:
-    """Create all function-calling tools for the bot, bound to the given session state."""
+def create_tools(session_state: dict, llm=None) -> ToolsSchema:
+    """Create all function-calling tools for the bot, bound to the given session state.
+
+    If llm is provided, registers each direct function with the LLM service.
+    """
 
     async def end_call(params: FunctionCallParams):
         """End the call. Use when the conversation has clearly concluded—goodbye, thanks, that's all, etc."""
@@ -160,13 +163,20 @@ def create_tools(session_state: dict) -> ToolsSchema:
             ],
         })
 
+    all_tools = [
+        end_call,
+        save_group,
+        save_member,
+        save_festival,
+        save_artist,
+        get_group_info,
+    ]
+
+    # Register each direct function with the LLM so pipecat can execute them
+    if llm is not None:
+        for fn in all_tools:
+            llm.register_direct_function(fn)
+
     return ToolsSchema(
-        standard_tools=[  # type: ignore[arg-type]
-            end_call,
-            save_group,
-            save_member,
-            save_festival,
-            save_artist,
-            get_group_info,
-        ]
+        standard_tools=all_tools  # type: ignore[arg-type]
     )
