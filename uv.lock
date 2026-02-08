@@ -3270,6 +3270,7 @@ name = "voice-agent-researcher"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "fastapi", extra = ["standard"] },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "pipecat-ai", extra = ["anthropic", "cartesia", "daily", "local-smart-turn-v3", "runner", "silero", "tracing", "webrtc"] },
@@ -3286,9 +3287,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp" },
     { name = "fastapi", extras = ["standard"] },
     { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "pipecat-ai", extras = ["anthropic", "cartesia", "daily", "local-smart-turn-v3", "runner", "silero", "tracing", "webrtc"] },
+    { name = "pipecat-ai", extras = ["anthropic", "cartesia", "daily", "local-smart-turn-v3", "runner", "silero", "tracing", "twilio", "webrtc"] },
     { name = "pipecat-ai-cli" },
     { name = "pipecatcloud", specifier = ">=0.2.19" },
     { name = "supabase" },

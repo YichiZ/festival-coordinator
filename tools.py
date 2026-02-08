@@ -1,5 +1,6 @@
 import os
 
+import aiohttp
 import anthropic
 from pipecat.frames.frames import EndTaskFrame
 from pipecat.processors.frame_processor import FrameDirection
@@ -8,6 +9,48 @@ from pipecat.services.llm_service import FunctionCallParams
 from loguru import logger
 
 import db
+
+
+async def get_call_info(call_sid: str) -> dict:
+    """Fetch call information from Twilio REST API using aiohttp.
+
+    Args:
+        call_sid: The Twilio call SID
+
+    Returns:
+        Dictionary containing call information including from_number, to_number.
+    """
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+
+    if not account_sid or not auth_token:
+        logger.warning("Missing Twilio credentials, cannot fetch call info")
+        return {}
+
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls/{call_sid}.json"
+
+    try:
+        auth = aiohttp.BasicAuth(account_sid, auth_token)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, auth=auth) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"Twilio API error ({response.status}): {error_text}")
+                    return {}
+
+                data = await response.json()
+
+                call_info = {
+                    "from_number": data.get("from"),
+                    "to_number": data.get("to"),
+                }
+
+                return call_info
+
+    except Exception as e:
+        logger.error(f"Error fetching call info from Twilio: {e}")
+        return {}
 
 SUMMARY_PROMPT = """Summarize this voice conversation between a festival planning assistant (Sophie) and the user. Focus on:
 
@@ -163,6 +206,38 @@ def create_tools(session_state: dict, llm=None) -> ToolsSchema:
             ],
         })
 
+    async def lookup_caller(params: FunctionCallParams):
+        """Look up who is calling based on their phone number. Call this at the start of the conversation to identify the caller and load their group context."""
+        from_number = session_state.get("from_number")
+        if not from_number:
+            await params.result_callback(
+                {"error": "No caller phone number available. Ask the caller for their name."}
+            )
+            return
+
+        member = db.get_member_by_phone(from_number)
+        if member:
+            group_info = member.get("groups")
+            group_id = member.get("group_id")
+            if group_id:
+                session_state["group_id"] = group_id
+                call = db.start_call(group_id)
+                session_state["call_id"] = call["id"]
+            await params.result_callback({
+                "known": True,
+                "member_id": member["id"],
+                "name": member["name"],
+                "city": member.get("city"),
+                "phone": member["phone"],
+                "group": group_info,
+            })
+        else:
+            await params.result_callback({
+                "known": False,
+                "phone": from_number,
+                "message": f"Unknown caller from {from_number}. Ask for their name and which group they belong to.",
+            })
+
     all_tools = [
         end_call,
         save_group,
@@ -170,6 +245,7 @@ def create_tools(session_state: dict, llm=None) -> ToolsSchema:
         save_festival,
         save_artist,
         get_group_info,
+        lookup_caller,
     ]
 
     # Register each direct function with the LLM so pipecat can execute them

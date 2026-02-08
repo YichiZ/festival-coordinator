@@ -65,7 +65,7 @@ export async function scrapeFestival(config: FestivalConfig): Promise<Artist[]> 
 
   const page = stagehand.context.pages()[0];
   await page.goto(config.url);
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
 
   const agent = stagehand.agent({
     systemPrompt: config.agentSystemPrompt,

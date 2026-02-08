@@ -1,0 +1,11 @@
+{
+	"scripts": {
+		"scrape:tomorrowland": "node scrape-tomorrowland.mjs"
+	},
+	"dependencies": {
+		"@browserbasehq/stagehand": "^3.0.8",
+		"dotenv": "^16.4.5",
+		"zod": "^4.3.6"
+	},
+	"packageManager": "pnpm@10.12.1+sha1.4bd977ce548dc9fcd1ca0c62838c55646cea6847"
+}
