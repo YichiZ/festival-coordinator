@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 from pipecat.runner.types import RunnerArguments
-from pipecat.runner.utils import create_transport
+from pipecat.runner.utils import create_transport, parse_telephony_websocket
 from pipecat.services.anthropic.llm import AnthropicLLMService
 from pipecat.services.cartesia.stt import CartesiaSTTService
 from pipecat.services.cartesia.tts import CartesiaTTSService
@@ -36,12 +36,16 @@ from pipecat.frames.frames import LLMRunFrame, TTSSpeakFrame
 
 from loguru import logger
 
-from tools import create_tools, summarize_transcript
+from tools import create_tools, get_call_info, summarize_transcript
 import db
 
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from pipecat.utils.tracing.setup import setup_tracing
-from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
+from pipecat.serializers.twilio import TwilioFrameSerializer
+from pipecat.transports.websocket.fastapi import (
+    FastAPIWebsocketParams,
+    FastAPIWebsocketTransport,
+)
 
 load_dotenv(override=True)
 
@@ -62,7 +66,7 @@ if IS_TRACING_ENABLED:
     logger.info("OpenTelemetry tracing initialized")
 
 
-async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, caller_info: dict | None = None):
     logger.info("Starting bot")
 
     stt = CartesiaSTTService(api_key=CARTESIA_API_KEY)
@@ -99,6 +103,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # --- Session state & tools ---
     session_state: dict = {"group_id": None, "call_id": None}
+    if caller_info:
+        session_state["from_number"] = caller_info.get("from_number")
+        session_state["to_number"] = caller_info.get("to_number")
     transcript_log: list[dict] = []
     tools = create_tools(session_state, llm=llm)
 
@@ -107,7 +114,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     messages = [
         {
             "role": "system",
-            "content": """You are Yichi. You're on a voice call helping a group of friends figure out which festivals to go to, buy tickets, and how to get everyone there without it being a logistical nightmare.
+            "content": """You are Alex. You're on a voice call helping a group of friends figure out which festivals to go to, buy tickets, and how to get everyone there without it being a logistical nightmare.
 
 Talk like an excited friend who loves festivals. Keep it short and hype — you're on a call, not writing an email. Ask one or two things at a time.
 
@@ -177,9 +184,17 @@ Early on, suggest a fun group name and ask if they're into it. Once they confirm
     async def on_client_connected(transport, client):
         logger.info("Client connected")
 
-        messages.append(
-            {"role": "system", "content": "Greet and introduce yourself as Yichi and that you're excited to help plan the trip. Keep it to a few sentences. Ask if it is a good time to talk."}
-        )
+        if session_state.get("from_number"):
+            messages.append(
+                {
+                    "role": "system",
+                    "content": "A caller just connected. First, call lookup_caller to identify who is calling. Then greet them warmly by name if they're a known member, or introduce yourself if they're new.",
+                }
+            )
+        else:
+            messages.append(
+                {"role": "system", "content": "Greet and introduce yourself as Yichi and that you're excited to help plan the trip. Keep it to a few sentences. Ask if it is a good time to talk."}
+            )
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
@@ -218,25 +233,53 @@ async def bot(runner_args: RunnerArguments):
 
     logger.info(f"Runner arguments: {runner_args}")
 
-    transport_params = {
-        "daily": lambda: DailyParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-        ),
-        "webrtc": lambda: TransportParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-        ),
-        "twilio": lambda: FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            vad_analyzer=SileroVADAnalyzer(),
-        ),
-    }
+    caller_info: dict = {}
 
-    transport = await create_transport(runner_args, transport_params)
+    # For Twilio telephony: parse websocket to extract call data for caller identification
+    websocket = getattr(runner_args, "websocket", None)
+    if websocket is not None:
+        _, call_data = await parse_telephony_websocket(websocket)
 
-    await run_bot(transport, runner_args)
+        # Fetch caller info from Twilio REST API
+        caller_info = await get_call_info(call_data["call_id"])
+        if caller_info:
+            logger.info(
+                f"Call from: {caller_info.get('from_number')} to: {caller_info.get('to_number')}"
+            )
+
+        serializer = TwilioFrameSerializer(
+            stream_sid=call_data["stream_id"],
+            call_sid=call_data["call_id"],
+            account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
+            auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
+        )
+
+        transport = FastAPIWebsocketTransport(
+            websocket=websocket,
+            params=FastAPIWebsocketParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                add_wav_header=False,
+                vad_analyzer=SileroVADAnalyzer(),
+                serializer=serializer,
+            ),
+        )
+    else:
+        # Non-telephony transports (Daily, WebRTC)
+        transport_params = {
+            "daily": lambda: DailyParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+            ),
+            "webrtc": lambda: TransportParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+            ),
+        }
+
+        transport = await create_transport(runner_args, transport_params)
+
+    await run_bot(transport, runner_args, caller_info=caller_info)
 
 
 if __name__ == "__main__":
