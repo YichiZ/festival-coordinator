@@ -88,3 +88,24 @@ class Artist(BaseModel):
     festival_id: UUID | None = None
     name: str
     priority: str | None = None
+
+
+# --- Festival Catalog ---
+
+class FestivalCatalogCreate(BaseModel):
+    name: str
+    location: str | None = None
+    dates_start: date | None = None
+    dates_end: date | None = None
+    ticket_price: float | None = None
+    on_sale_date: date | None = None
+
+
+class FestivalCatalog(BaseModel):
+    id: UUID
+    name: str
+    location: str | None = None
+    dates_start: date | None = None
+    dates_end: date | None = None
+    ticket_price: float | None = None
+    on_sale_date: date | None = None
