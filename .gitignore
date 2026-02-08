@@ -7,3 +7,4 @@ __pycache__/
 command.sh
 .DS_STORE
 TODO.md
+frontend/dist/
