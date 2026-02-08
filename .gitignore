@@ -1,7 +1,9 @@
 .venv/
+node_modules/
 __pycache__/
 *.pyc
 .env
 
 command.sh
 .DS_STORE
+TODO.md

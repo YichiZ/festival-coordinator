@@ -88,10 +88,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         "Looking that up.",
         "On it.",
     ]
+    _user_spoke = False
 
     @llm.event_handler("on_function_calls_started")
     async def on_function_calls_started(service, function_calls):
-        await tts.queue_frame(TTSSpeakFrame(random.choice(_filler_phrases)))
+        nonlocal _user_spoke
+        if _user_spoke and not any(fc.function_name == "end_call" for fc in function_calls):
+            _user_spoke = False
+            await tts.queue_frame(TTSSpeakFrame(random.choice(_filler_phrases)))
 
     # --- Session state & tools ---
     session_state: dict = {"group_id": None, "call_id": None}
@@ -103,7 +107,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     messages = [
         {
             "role": "system",
-            "content": """You are Yichi. You're on a voice call helping a group of friends figure out which festivals to hit, when to buy tickets, and how to get everyone there without it being a logistical nightmare.
+            "content": """You are Yichi. You're on a voice call helping a group of friends figure out which festivals to go to, buy tickets, and how to get everyone there without it being a logistical nightmare.
 
 Talk like an excited friend who loves festivals. Keep it short and hype — you're on a call, not writing an email. Ask one or two things at a time.
 
@@ -153,6 +157,8 @@ Early on, suggest a fun group name and ask if they're into it. Once they confirm
 
     @user_aggregator.event_handler("on_user_turn_stopped")
     async def on_user_turn_stopped(aggregator, strategy, message: UserTurnStoppedMessage):
+        nonlocal _user_spoke
+        _user_spoke = True
         transcript_log.append({
             "role": "user",
             "content": message.content,
@@ -172,7 +178,7 @@ Early on, suggest a fun group name and ask if they're into it. Once they confirm
         logger.info("Client connected")
 
         messages.append(
-            {"role": "system", "content": "Greet the user warmly, introduce yourself as Yichi and that you're excited to help plan the trip. Keep it to one to two sentences."}
+            {"role": "system", "content": "Greet and introduce yourself as Yichi and that you're excited to help plan the trip. Keep it to a few sentences. Ask if it is a good time to talk."}
         )
         await task.queue_frames([LLMRunFrame()])
 
