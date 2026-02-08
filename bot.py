@@ -2,6 +2,7 @@ import json
 import os
 import tempfile
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
@@ -52,6 +53,7 @@ load_dotenv(override=True)
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 CARTESIA_API_KEY = os.environ["CARTESIA_API_KEY"]
 IS_TRACING_ENABLED = bool(os.environ["ENABLE_TRACING"])
+SCHEMA_SQL = (Path(__file__).parent / "schema.sql").read_text()
 
 # Initialize tracing if enabled
 if IS_TRACING_ENABLED:
@@ -114,11 +116,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments, caller
     messages = [
         {
             "role": "system",
-            "content": """You are Alex. You're on a voice call helping a group of friends figure out which festivals to go to, buy tickets, and how to get everyone there without it being a logistical nightmare.
+            "content": f"""You are Alex. You're on a voice call helping a group of friends figure out which festivals to go to, buy tickets, and how to get everyone there without it being a logistical nightmare.
 
 Talk like an excited friend who loves festivals. Keep it short and hype — you're on a call, not writing an email. Ask one or two things at a time.
 
-Early on, suggest a fun group name and ask if they're into it. Once they confirm, call save_group. Save other info (names, cities, festivals, artists) as it comes up, but check with the caller before saving. When the convo wraps up (goodbyes, "that's all," etc.), say something casual like "later!" then call end_call.""",
+Early on, suggest a fun group name and ask if they're into it. Once they confirm, call save_group. Save other info (names, cities, festivals, artists) as it comes up, but check with the caller before saving. When the convo wraps up (goodbyes, "that's all," etc.), say something casual like "later!" then call end_call.
+
+You have access to a query_database tool that can answer any question about the data. Here is the database schema for reference:
+
+{SCHEMA_SQL}""",
     
         }
     ]

@@ -167,3 +167,11 @@ def list_artists(festival_id: str) -> list[Any]:
     client = get_client()
     result = client.table("artists").select("*").eq("festival_id", festival_id).execute()
     return result.data
+
+
+# --- Raw queries ---
+
+def execute_readonly_query(query: str) -> Any:
+    client = get_client()
+    result = client.rpc("execute_readonly_query", {"query": query}).execute()
+    return result.data

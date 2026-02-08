@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import aiohttp
 import anthropic
@@ -206,6 +207,40 @@ def create_tools(session_state: dict, llm=None) -> ToolsSchema:
             ],
         })
 
+    _schema_sql = (Path(__file__).parent / "schema.sql").read_text()
+
+    async def query_database(params: FunctionCallParams, question: str):
+        """Query the database using natural language. Use this to look up any information about
+        groups, members, festivals, artists, or past calls.
+
+        Args:
+            question: A natural-language question, e.g. "which festivals is Jake's crew considering?"
+        """
+        client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=512,
+            system="You are a SQL query generator. Given a Postgres schema and a question, "
+            "return ONLY a single SELECT query. No explanation, no markdown fences.",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"Schema:\n{_schema_sql}\n\nQuestion: {question}",
+                }
+            ],
+        )
+        sql = response.content[0].text.strip()  # type: ignore[union-attr]
+
+        # Strip markdown code fences if the model wraps the query
+        if sql.startswith("```"):
+            sql = sql.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+
+        try:
+            result = db.execute_readonly_query(sql)
+            await params.result_callback({"query": sql, "result": result})
+        except Exception as e:
+            await params.result_callback({"error": str(e), "query": sql})
+
     async def lookup_caller(params: FunctionCallParams):
         """Look up who is calling based on their phone number. Call this at the start of the conversation to identify the caller and load their group context."""
         from_number = session_state.get("from_number")
@@ -245,6 +280,7 @@ def create_tools(session_state: dict, llm=None) -> ToolsSchema:
         save_festival,
         save_artist,
         get_group_info,
+        query_database,
         lookup_caller,
     ]
 
