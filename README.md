@@ -60,26 +60,50 @@ A **React** + **TypeScript** single-page app for managing groups and festivals v
 
 ### Environment Variables
 
-Create a `.env` file in the project root:
+Copy the example env file and fill in your keys:
 
+```bash
+cp .env.example .env
 ```
-ANTHROPIC_API_KEY=...
-CARTESIA_API_KEY=...
-SUPABASE_URL=...
-SUPABASE_API_KEY=...
-ENABLE_TRACING=false
 
-# Optional — for Twilio telephony
-TWILIO_ACCOUNT_SID=...
-TWILIO_AUTH_TOKEN=...
-```
+See `.env.example` for the full list of variables. At minimum you need:
+
+- `ANTHROPIC_API_KEY` — Claude API key
+- `CARTESIA_API_KEY` — Cartesia STT/TTS key
+- `SUPABASE_URL` / `SUPABASE_API_KEY` — Supabase project credentials
+
+Optional variables for telephony (Twilio) and observability (Langfuse) are documented in the example file.
 
 ### Voice Agent
+
+**Local dev (Daily WebRTC — no phone needed):**
 
 ```bash
 uv sync
 uv run python bot.py
 ```
+
+**Twilio telephony (receive real phone calls):**
+
+1. Set `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` in your `.env`.
+2. Expose your local server with ngrok:
+   ```bash
+   ngrok http 7860
+   ```
+3. In the [Twilio Console](https://console.twilio.com/), create a TwiML Bin with:
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <Response>
+     <Connect>
+       <Stream url="wss://<your-ngrok-url>/ws" />
+     </Connect>
+   </Response>
+   ```
+   Then assign the bin to your Twilio phone number under **Voice Configuration**.
+4. Start the bot with the Twilio transport:
+   ```bash
+   uv run python bot.py -t twilio
+   ```
 
 ### REST API
 
@@ -104,3 +128,26 @@ Runs at `http://localhost:5173`.
 Schema is defined in `schema.sql`. Incremental changes live in `migrations/`, numbered sequentially. Seed data for development is in `seed.sql`.
 
 Tables: `groups`, `members`, `calls`, `festivals`, `artists`, `festival_catalog`.
+
+## Observability
+
+The voice pipeline supports tracing via [Langfuse](https://langfuse.com/) using the OpenTelemetry (OTLP) protocol. When `ENABLE_TRACING=true`, Pipecat spans (LLM calls, STT/TTS latency, tool invocations) are exported to Langfuse so you can inspect conversations, debug latency, and monitor costs.
+
+To enable tracing, set the following in your `.env`:
+
+```
+ENABLE_TRACING=true
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_BASE_URL=https://us.cloud.langfuse.com
+OTEL_EXPORTER_OTLP_ENDPOINT=https://us.cloud.langfuse.com/api/public/otel
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64-encoded public:secret>
+```
+
+Sign up at [langfuse.com](https://langfuse.com/) and create a project to get your keys. The base64 header value is `base64(public_key:secret_key)`.
+
+## Lineup Scraper
+
+The `browserbase-client/` directory contains a Node.js scraper built with [Stagehand](https://github.com/browserbase/stagehand) (Browserbase) that extracts festival lineups from official websites. It uses an AI agent to navigate lineup pages and extract artist/stage/time data into CSV and JSON.
+
+See [`browserbase-client/my-stagehand-app/README.md`](browserbase-client/my-stagehand-app/README.md) for setup and usage.
