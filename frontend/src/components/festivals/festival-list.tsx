@@ -7,7 +7,7 @@ export function FestivalList({ festivals }: { festivals: Festival[] }) {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {festivals.map((f) => (
         <FestivalCard key={f.id} festival={f} />
       ))}

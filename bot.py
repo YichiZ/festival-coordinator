@@ -245,6 +245,7 @@ async def bot(runner_args: RunnerArguments):
     websocket = getattr(runner_args, "websocket", None)
     if websocket is not None:
         _, call_data = await parse_telephony_websocket(websocket)
+        logger.info(f"Twilio call_data: {call_data}")
 
         # Fetch caller info from Twilio REST API
         caller_info = await get_call_info(call_data["call_id"])
@@ -259,6 +260,7 @@ async def bot(runner_args: RunnerArguments):
             account_sid=os.getenv("TWILIO_ACCOUNT_SID", ""),
             auth_token=os.getenv("TWILIO_AUTH_TOKEN", ""),
         )
+
 
         transport = FastAPIWebsocketTransport(
             websocket=websocket,

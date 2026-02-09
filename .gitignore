@@ -5,6 +5,7 @@ __pycache__/
 .env
 
 command.sh
-.DS_STORE
+.DS_Store
 TODO.md
 frontend/dist/
+.run/

@@ -7,6 +7,21 @@ function formatDate(d: string | null) {
   return new Date(d + "T00:00:00").toLocaleDateString();
 }
 
+const festivalStatusConfig: Record<string, { label: string; className: string }> = {
+  committed: {
+    label: "Committed",
+    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400",
+  },
+  considering: {
+    label: "Considering",
+    className: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400",
+  },
+  passed: {
+    label: "Passed",
+    className: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+  },
+};
+
 export function FestivalCard({ festival }: { festival: Festival }) {
   const dateRange = [
     formatDate(festival.dates_start),
@@ -15,17 +30,19 @@ export function FestivalCard({ festival }: { festival: Festival }) {
     .filter(Boolean)
     .join(" – ");
 
+  const status = festivalStatusConfig[festival.status ?? ""] ?? null;
+
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-2">
-        <CardTitle className="text-base">{festival.name}</CardTitle>
-        {festival.status && (
-          <Badge variant={festival.status === "going" ? "default" : "secondary"}>
-            {festival.status}
+      <CardHeader className="flex flex-row items-start justify-between gap-2 p-4 pb-2">
+        <CardTitle className="text-sm font-semibold">{festival.name}</CardTitle>
+        {status && (
+          <Badge variant="secondary" className={status.className}>
+            {status.label}
           </Badge>
         )}
       </CardHeader>
-      <CardContent className="space-y-1 text-sm text-muted-foreground">
+      <CardContent className="space-y-1 px-4 pb-4 pt-0 text-xs text-muted-foreground">
         {festival.location && <p>{festival.location}</p>}
         {dateRange && <p>{dateRange}</p>}
         {festival.ticket_price != null && <p>${festival.ticket_price}</p>}

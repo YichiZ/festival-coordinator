@@ -1,6 +1,7 @@
 export interface Group {
   id: string;
   name: string | null;
+  description: string | null;
   created_at: string | null;
 }
 
@@ -10,6 +11,7 @@ export interface Member {
   name: string;
   city: string | null;
   phone: string | null;
+  status: string | null;
 }
 
 export interface Festival {

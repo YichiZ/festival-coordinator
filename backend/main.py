@@ -9,6 +9,7 @@ from backend.models import (
     FestivalCreate,
     GroupCreate,
     MemberCreate,
+    MemberUpdate,
 )
 
 app = FastAPI(title="Festival Coordinator API")
@@ -46,10 +47,13 @@ def create_group(body: GroupCreate):
     return result.data[0]
 
 
+_STATUS_ORDER = {"active": 0, "pending": 1, "inactive": 2}
+
+
 @app.get("/groups/{group_id}/members")
 def list_group_members(group_id: str):
-    result = get_client().table("members").select("*").eq("group_id", group_id).execute()
-    return result.data
+    result = get_client().table("members").select("*").eq("group_id", group_id).order("name").execute()
+    return sorted(result.data, key=lambda m: (_STATUS_ORDER.get(m.get("status", ""), 9), m.get("name", "")))
 
 
 @app.get("/groups/{group_id}/festivals")
@@ -88,6 +92,22 @@ def create_member(body: MemberCreate):
     data["group_id"] = str(data["group_id"])
     result = get_client().table("members").insert(data).execute()
     return result.data[0]
+
+
+@app.patch("/members/{member_id}")
+def update_member(member_id: str, body: MemberUpdate):
+    data = body.model_dump(exclude_none=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    result = get_client().table("members").update(data).eq("id", member_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Member not found")
+    return result.data[0]
+
+
+@app.delete("/members/{member_id}", status_code=204)
+def delete_member(member_id: str):
+    get_client().table("members").delete().eq("id", member_id).execute()
 
 
 # ── Calls ────────────────────────────────────────────────────────────────────

@@ -25,12 +25,20 @@ class MemberCreate(BaseModel):
     phone: str | None = None
 
 
+class MemberUpdate(BaseModel):
+    name: str | None = None
+    city: str | None = None
+    phone: str | None = None
+    status: str | None = None
+
+
 class Member(BaseModel):
     id: UUID
     group_id: UUID | None = None
     name: str
     city: str | None = None
     phone: str | None = None
+    status: str | None = None
 
 
 # --- Calls ---
