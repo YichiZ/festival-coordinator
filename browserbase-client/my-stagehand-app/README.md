@@ -1,35 +1,58 @@
-# 🤘 Welcome to Stagehand!
+# Festival Lineup Scraper
 
-Hey! This is a project built with [Stagehand](https://github.com/browserbase/stagehand).
+AI-powered scraper that extracts festival lineups (artist, stage, date, time) from official festival websites using [Stagehand](https://github.com/browserbase/stagehand) and [Browserbase](https://browserbase.com/).
 
-You can build your own web agent using: `npx create-browser-app`!
+## How It Works
 
-## Setting the Stage
+1. A Stagehand agent navigates to the festival's lineup page and interacts with the UI (expanding tabs, scrolling, etc.) to surface the full schedule.
+2. Stagehand's `extract()` method pulls structured artist data from the page.
+3. Results are saved as both CSV and JSON in the `output/` directory.
 
-Stagehand is an SDK for automating browsers. It's built on top of [Playwright](https://playwright.dev/) and provides a higher-level API for better debugging and AI fail-safes.
-
-## Curtain Call
-
-Get ready for a show-stopping development experience. Just run:
+## Setup
 
 ```bash
+npm install
+cp ../.env.example ../.env   # then fill in your keys
+```
+
+You need at minimum:
+
+- `BROWSERBASE_PROJECT_ID` / `BROWSERBASE_API_KEY` — from [browserbase.com](https://browserbase.com/)
+- `ANTHROPIC_API_KEY` — or another LLM provider key, depending on the model you configure in `scraper.ts`
+
+## Usage
+
+```bash
+# List available festivals
 npm start
+
+# Scrape a specific festival
+npm start -- coachella
+npm start -- edc
+npm start -- tomorrowland
+
+# Scrape all festivals
+npm start -- --all
 ```
 
-## What's Next?
+Output lands in `output/` as `<festival-name>.csv` and `<festival-name>.json`.
 
-### Add your API keys
+## Adding a New Festival
 
-Required API keys/environment variables are in the `.env.example` file. Copy it to `.env` and add your API keys.
+Create a new file in `festivals/` exporting a `FestivalConfig` object:
 
-```bash
-cp .env.example .env && nano .env # Add your API keys to .env
+```ts
+import type { FestivalConfig } from "../scraper.js";
+
+const myFest: FestivalConfig = {
+  name: "my-fest-2026",
+  url: "https://myfest.com/lineup",
+  agentSystemPrompt: "You are navigating a festival lineup page...",
+  agentInstruction: "Navigate to the full lineup and expand all days...",
+  extractInstruction: "Extract every artist with their stage, date, and set time.",
+};
+
+export default myFest;
 ```
 
-### Custom .cursorrules
-
-We have custom .cursorrules for this project. It'll help quite a bit with writing Stagehand easily.
-
-### Run on Local
-
-To run on a local browser, add your API keys to .env and change `env: "LOCAL"` to `env: "BROWSERBASE"` in [stagehand.config.ts](stagehand.config.ts).
+Then register it in `festivals/index.ts`.
