@@ -76,10 +76,34 @@ Optional variables for telephony (Twilio) and observability (Langfuse) are docum
 
 ### Voice Agent
 
+**Local dev (Daily WebRTC — no phone needed):**
+
 ```bash
 uv sync
 uv run python bot.py
 ```
+
+**Twilio telephony (receive real phone calls):**
+
+1. Set `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` in your `.env`.
+2. Expose your local server with ngrok:
+   ```bash
+   ngrok http 7860
+   ```
+3. In the [Twilio Console](https://console.twilio.com/), create a TwiML Bin with:
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <Response>
+     <Connect>
+       <Stream url="wss://<your-ngrok-url>/ws" />
+     </Connect>
+   </Response>
+   ```
+   Then assign the bin to your Twilio phone number under **Voice Configuration**.
+4. Start the bot with the Twilio transport:
+   ```bash
+   uv run python bot.py -t twilio
+   ```
 
 ### REST API
 
