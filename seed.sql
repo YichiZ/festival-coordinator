@@ -2,7 +2,7 @@
 -- Clears existing data and inserts fresh records
 
 -- Clean slate (order matters for foreign keys)
-truncate artists, festivals, calls, members, groups cascade;
+truncate reviews, artists, festivals, calls, members, groups cascade;
 
 -- ============================================================
 -- Groups
@@ -63,3 +63,11 @@ insert into calls (id, group_id, started_at, ended_at, summary, from_number) val
     '2026-02-03 20:00:00+00', '2026-02-03 20:20:00+00',
     '- East Coast Explorers locked in for Governors Ball\n- Jack and Jacqueline buying tickets this week\n- Steve interested in Bonnaroo as a road trip\n- Priya dropped out (marked inactive)',
     '+12125550201');
+
+-- ============================================================
+-- Reviews
+-- ============================================================
+insert into reviews (user_id, festival_id, stars, text) values
+  ('bbbbbbbb-0001-4000-b000-000000000005', 'cccccccc-0001-4000-c000-000000000004', 5, 'Governors Ball was incredible. SZA and Raye killed it.'),
+  ('bbbbbbbb-0001-4000-b000-000000000006', 'cccccccc-0001-4000-c000-000000000004', 4, 'Great vibes, would go again. Lineup was solid.'),
+  ('bbbbbbbb-0001-4000-b000-000000000007', 'cccccccc-0001-4000-c000-000000000005', 5, 'Bonnaroo is the best. Tame Impala and Japanese Breakfast were highlights.');

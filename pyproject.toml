@@ -4,13 +4,16 @@ version = "0.1.0"
 description = "Voice agent researcher"
 requires-python = ">=3.12"
 dependencies = [
-    "pipecat-ai[anthropic,cartesia,daily,local-smart-turn-v3,runner,silero,tracing,twilio,webrtc]",
+    "pipecat-ai[anthropic,cartesia,daily,local-smart-turn-v3,runner,silero,tracing,webrtc]",
     "pipecat-ai-cli",
     "supabase",
     "pipecatcloud>=0.2.19",
     "opentelemetry-exporter-otlp-proto-http",
     "fastapi[standard]",
     "aiohttp",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]",
+    "python-dotenv",
 ]
 
 [dependency-groups]
