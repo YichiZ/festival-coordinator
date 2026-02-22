@@ -3,7 +3,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-
 # --- Groups ---
 
 class GroupCreate(BaseModel):
@@ -69,6 +68,8 @@ class FestivalCreate(BaseModel):
     ticket_price: float | None = None
     on_sale_date: date | None = None
     status: str = "considering"
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class Festival(BaseModel):
@@ -81,6 +82,8 @@ class Festival(BaseModel):
     ticket_price: float | None = None
     on_sale_date: date | None = None
     status: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 # --- Artists ---
@@ -107,6 +110,8 @@ class FestivalCatalogCreate(BaseModel):
     dates_end: date | None = None
     ticket_price: float | None = None
     on_sale_date: date | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class FestivalCatalog(BaseModel):
@@ -117,3 +122,23 @@ class FestivalCatalog(BaseModel):
     dates_end: date | None = None
     ticket_price: float | None = None
     on_sale_date: date | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+# --- Reviews ---
+
+class ReviewCreate(BaseModel):
+    user_id: UUID
+    festival_id: UUID
+    stars: int
+    text: str | None = None
+
+
+class Review(BaseModel):
+    id: UUID
+    user_id: UUID
+    festival_id: UUID
+    stars: int
+    text: str | None = None
+    created_at: datetime | None = None
