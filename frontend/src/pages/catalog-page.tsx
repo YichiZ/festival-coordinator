@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -10,25 +8,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  listFestivalCatalog,
-  searchFestivalCatalog,
-} from "@/api/festival-catalog";
+import { CatalogSearchForm } from "@/components/catalog/catalog-search-form";
+import { searchFestivalCatalog } from "@/api/festival-catalog";
 import type { FestivalCatalogEntry } from "@/api/types";
-
-function formatDate(d: string | null) {
-  if (!d) return null;
-  return new Date(d + "T00:00:00").toLocaleDateString();
-}
-
-function formatPrice(n: number | null) {
-  if (n == null) return null;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
+import { formatDate, formatPrice } from "@/lib/utils";
 
 export function CatalogPage() {
   const [catalog, setCatalog] = useState<FestivalCatalogEntry[]>([]);
@@ -37,7 +20,7 @@ export function CatalogPage() {
   const [searchLat, setSearchLat] = useState("");
   const [searchLon, setSearchLon] = useState("");
 
-  const runSearch = useCallback(() => {
+  function runSearch() {
     setLoading(true);
     const params: { name?: string; latitude?: number; longitude?: number } = {};
     if (searchName.trim()) params.name = searchName.trim();
@@ -45,26 +28,14 @@ export function CatalogPage() {
     const lon = parseFloat(searchLon);
     if (!Number.isNaN(lat)) params.latitude = lat;
     if (!Number.isNaN(lon)) params.longitude = lon;
-    const hasFilters =
-      params.name != null ||
-      params.latitude != null ||
-      params.longitude != null;
-    (hasFilters ? searchFestivalCatalog(params) : listFestivalCatalog())
+    searchFestivalCatalog(params)
       .then(setCatalog)
-      .catch(() => {
-        /* keep existing catalog on error */
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
-  }, [searchName, searchLat, searchLon]);
+  }
 
   useEffect(() => {
-    setLoading(true);
-    listFestivalCatalog()
-      .then(setCatalog)
-      .catch(() => {
-        /* keep existing catalog on error; only stop loading */
-      })
-      .finally(() => setLoading(false));
+    searchFestivalCatalog({}).then(setCatalog).finally(() => setLoading(false));
   }, []);
 
   return (
@@ -78,55 +49,15 @@ export function CatalogPage() {
         <h1 className="text-2xl font-bold">Browse Festival Catalog</h1>
       </div>
 
-      <div className="space-y-2 rounded-lg border bg-muted/30 p-4">
-        <p className="text-sm font-medium">Search by name or location</p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="catalog-search-name" className="text-xs">
-              Name
-            </Label>
-            <Input
-              id="catalog-search-name"
-              type="text"
-              placeholder="e.g. Coachella"
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="catalog-search-lat" className="text-xs">
-              Latitude
-            </Label>
-            <Input
-              id="catalog-search-lat"
-              type="number"
-              step="any"
-              placeholder="e.g. 40.7"
-              value={searchLat}
-              onChange={(e) => setSearchLat(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="catalog-search-lon" className="text-xs">
-              Longitude
-            </Label>
-            <Input
-              id="catalog-search-lon"
-              type="number"
-              step="any"
-              placeholder="e.g. -74"
-              value={searchLon}
-              onChange={(e) => setSearchLon(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            />
-          </div>
-        </div>
-        <Button type="button" variant="secondary" size="sm" onClick={runSearch}>
-          Search
-        </Button>
-      </div>
+      <CatalogSearchForm
+        searchName={searchName}
+        setSearchName={setSearchName}
+        searchLat={searchLat}
+        setSearchLat={setSearchLat}
+        searchLon={searchLon}
+        setSearchLon={setSearchLon}
+        onSearch={runSearch}
+      />
 
       {loading ? (
         <p className="text-muted-foreground">Loading festivals...</p>
@@ -164,16 +95,11 @@ export function CatalogPage() {
                       )}
                     </p>
                   )}
-                  {(() => {
-                    const lat = Number(f.latitude);
-                    const lon = Number(f.longitude);
-                    if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
-                    return (
-                      <p className="text-muted-foreground text-xs">
-                        {lat.toFixed(4)}, {lon.toFixed(4)}
-                      </p>
-                    );
-                  })()}
+                  {f.latitude != null && f.longitude != null && (
+                    <p className="text-muted-foreground text-xs">
+                      {Number(f.latitude).toFixed(4)}, {Number(f.longitude).toFixed(4)}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             );
