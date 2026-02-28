@@ -37,9 +37,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_STATUS_ORDER = {"active": 0, "pending": 1, "inactive": 2}
-
-
 # ── Groups ───────────────────────────────────────────────────────────────────
 
 
@@ -76,8 +73,9 @@ def list_group_members(group_id: str, db: Session = Depends(get_db)):
         .scalars()
         .all()
     )
+    status_order = {"active": 0, "pending": 1, "inactive": 2}
     out = [orm_to_dict(r) for r in rows]
-    return sorted(out, key=lambda m: (_STATUS_ORDER.get(m.get("status", ""), 9), m.get("name", "")))
+    return sorted(out, key=lambda m: (status_order.get(m.get("status", ""), 9), m.get("name", "")))
 
 
 @app.get("/groups/{group_id}/festivals")
@@ -118,7 +116,6 @@ def get_member(member_id: str, db: Session = Depends(get_db)):
 @app.post("/members", status_code=201)
 def create_member(body: MemberCreate, db: Session = Depends(get_db)):
     data = body.model_dump(exclude_none=True)
-    data["group_id"] = UUID(str(data["group_id"]))
     row = Member(**data)
     db.add(row)
     db.commit()
@@ -170,7 +167,6 @@ def get_call(call_id: str, db: Session = Depends(get_db)):
 @app.post("/calls", status_code=201)
 def create_call(body: CallCreate, db: Session = Depends(get_db)):
     data = body.model_dump(exclude_none=True)
-    data["group_id"] = UUID(str(data["group_id"]))
     row = Call(**data)
     db.add(row)
     db.commit()
@@ -200,7 +196,6 @@ def get_festival(festival_id: str, db: Session = Depends(get_db)):
 @app.post("/festivals", status_code=201)
 def create_festival(body: FestivalCreate, db: Session = Depends(get_db)):
     data = body.model_dump(exclude_none=True)
-    data["group_id"] = UUID(str(data["group_id"]))
     row = Festival(**data)
     db.add(row)
     db.commit()
@@ -230,7 +225,6 @@ def get_artist(artist_id: str, db: Session = Depends(get_db)):
 @app.post("/artists", status_code=201)
 def create_artist(body: ArtistCreate, db: Session = Depends(get_db)):
     data = body.model_dump(exclude_none=True)
-    data["festival_id"] = UUID(str(data["festival_id"]))
     row = Artist(**data)
     db.add(row)
     db.commit()
@@ -259,6 +253,7 @@ def search_festival_catalog(
     q = select(FestivalCatalog)
     if name is not None and name.strip():
         q = q.where(FestivalCatalog.name.ilike(f"%{name.strip()}%"))
+    params: dict = {}
     if latitude is not None and longitude is not None:
         q = q.where(
             FestivalCatalog.latitude.isnot(None),
@@ -271,10 +266,10 @@ def search_festival_catalog(
                 ")"
             )
         )
-        rows = db.execute(q, {"lat": latitude, "lon": longitude}).scalars().all()
+        params = {"lat": latitude, "lon": longitude}
     else:
         q = q.order_by(FestivalCatalog.dates_start)
-        rows = db.execute(q).scalars().all()
+    rows = db.execute(q, params).scalars().all()
     return [orm_to_dict(r) for r in rows]
 
 
@@ -322,8 +317,6 @@ def get_review(review_id: str, db: Session = Depends(get_db)):
 @app.post("/reviews", status_code=201)
 def create_review(body: ReviewCreate, db: Session = Depends(get_db)):
     data = body.model_dump(exclude_none=True)
-    data["user_id"] = UUID(str(data["user_id"]))
-    data["festival_id"] = UUID(str(data["festival_id"]))
     row = Review(**data)
     db.add(row)
     db.commit()

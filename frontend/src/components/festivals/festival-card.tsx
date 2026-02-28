@@ -1,11 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Festival } from "@/api/types";
-
-function formatDate(d: string | null) {
-  if (!d) return null;
-  return new Date(d + "T00:00:00").toLocaleDateString();
-}
+import { formatDate, formatPrice } from "@/lib/utils";
 
 const festivalStatusConfig: Record<string, { label: string; className: string }> = {
   committed: {
@@ -45,7 +41,7 @@ export function FestivalCard({ festival }: { festival: Festival }) {
       <CardContent className="space-y-1 px-4 pb-4 pt-0 text-xs text-muted-foreground">
         {festival.location && <p>{festival.location}</p>}
         {dateRange && <p>{dateRange}</p>}
-        {festival.ticket_price != null && <p>${festival.ticket_price}</p>}
+        {festival.ticket_price != null && <p>{formatPrice(festival.ticket_price)}</p>}
         {festival.artists && festival.artists.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-1">
             {festival.artists.map((a) => (
