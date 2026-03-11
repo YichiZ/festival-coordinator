@@ -42,4 +42,6 @@ export interface FestivalCatalogEntry {
   dates_end: string | null;
   ticket_price: number | null;
   on_sale_date: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
