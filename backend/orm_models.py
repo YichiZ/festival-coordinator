@@ -146,7 +146,7 @@ def orm_to_dict(row: Base, *, exclude: set[str] | None = None) -> dict[str, Any]
         if c.name in exclude:
             continue
         v = getattr(row, c.name)
-        if hasattr(v, "hex"):  # UUID
+        if isinstance(v, uuid.UUID):
             d[c.name] = str(v)
         elif isinstance(v, (date, datetime)):
             d[c.name] = v.isoformat() if v else None

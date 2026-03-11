@@ -50,8 +50,8 @@ def list_groups(db: Session = Depends(get_db)):
 
 
 @app.get("/groups/{group_id}")
-def get_group(group_id: str, db: Session = Depends(get_db)):
-    row = db.execute(select(Group).where(Group.id == UUID(group_id))).scalars().one_or_none()
+def get_group(group_id: UUID, db: Session = Depends(get_db)):
+    row = db.execute(select(Group).where(Group.id == group_id)).scalars().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Group not found")
     return orm_to_dict(row)
@@ -68,10 +68,10 @@ def create_group(body: GroupCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/groups/{group_id}/members")
-def list_group_members(group_id: str, db: Session = Depends(get_db)):
+def list_group_members(group_id: UUID, db: Session = Depends(get_db)):
     rows = (
         db.execute(
-            select(Member).where(Member.group_id == UUID(group_id)).order_by(Member.name)
+            select(Member).where(Member.group_id == group_id).order_by(Member.name)
         )
         .scalars()
         .all()
@@ -81,11 +81,11 @@ def list_group_members(group_id: str, db: Session = Depends(get_db)):
 
 
 @app.get("/groups/{group_id}/festivals")
-def list_group_festivals(group_id: str, db: Session = Depends(get_db)):
+def list_group_festivals(group_id: UUID, db: Session = Depends(get_db)):
     rows = (
         db.execute(
             select(Festival)
-            .where(Festival.group_id == UUID(group_id))
+            .where(Festival.group_id == group_id)
             .options(selectinload(Festival.artists))
             .order_by(Festival.dates_start)
         )
@@ -108,8 +108,8 @@ def list_members(db: Session = Depends(get_db)):
 
 
 @app.get("/members/{member_id}")
-def get_member(member_id: str, db: Session = Depends(get_db)):
-    row = db.execute(select(Member).where(Member.id == UUID(member_id))).scalars().one_or_none()
+def get_member(member_id: UUID, db: Session = Depends(get_db)):
+    row = db.execute(select(Member).where(Member.id == member_id)).scalars().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Member not found")
     return orm_to_dict(row)
@@ -127,11 +127,11 @@ def create_member(body: MemberCreate, db: Session = Depends(get_db)):
 
 
 @app.patch("/members/{member_id}")
-def update_member(member_id: str, body: MemberUpdate, db: Session = Depends(get_db)):
+def update_member(member_id: UUID, body: MemberUpdate, db: Session = Depends(get_db)):
     data = body.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
-    row = db.execute(select(Member).where(Member.id == UUID(member_id))).scalars().one_or_none()
+    row = db.execute(select(Member).where(Member.id == member_id)).scalars().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Member not found")
     for k, v in data.items():
@@ -142,8 +142,8 @@ def update_member(member_id: str, body: MemberUpdate, db: Session = Depends(get_
 
 
 @app.delete("/members/{member_id}", status_code=204)
-def delete_member(member_id: str, db: Session = Depends(get_db)):
-    row = db.execute(select(Member).where(Member.id == UUID(member_id))).scalars().one_or_none()
+def delete_member(member_id: UUID, db: Session = Depends(get_db)):
+    row = db.execute(select(Member).where(Member.id == member_id)).scalars().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Member not found")
     db.delete(row)
@@ -160,8 +160,8 @@ def list_calls(db: Session = Depends(get_db)):
 
 
 @app.get("/calls/{call_id}")
-def get_call(call_id: str, db: Session = Depends(get_db)):
-    row = db.execute(select(Call).where(Call.id == UUID(call_id))).scalars().one_or_none()
+def get_call(call_id: UUID, db: Session = Depends(get_db)):
+    row = db.execute(select(Call).where(Call.id == call_id)).scalars().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Call not found")
     return orm_to_dict(row)
@@ -188,9 +188,9 @@ def list_festivals(db: Session = Depends(get_db)):
 
 
 @app.get("/festivals/{festival_id}")
-def get_festival(festival_id: str, db: Session = Depends(get_db)):
+def get_festival(festival_id: UUID, db: Session = Depends(get_db)):
     row = db.execute(
-        select(Festival).where(Festival.id == UUID(festival_id))
+        select(Festival).where(Festival.id == festival_id)
     ).scalars().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Festival not found")
@@ -218,9 +218,9 @@ def list_artists(db: Session = Depends(get_db)):
 
 
 @app.get("/artists/{artist_id}")
-def get_artist(artist_id: str, db: Session = Depends(get_db)):
+def get_artist(artist_id: UUID, db: Session = Depends(get_db)):
     row = db.execute(
-        select(Artist).where(Artist.id == UUID(artist_id))
+        select(Artist).where(Artist.id == artist_id)
     ).scalars().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Artist not found")
@@ -296,23 +296,23 @@ def create_festival_catalog_entry(
 @app.get("/reviews")
 def list_reviews(
     db: Session = Depends(get_db),
-    festival_id: str | None = Query(None),
-    user_id: str | None = Query(None),
+    festival_id: UUID | None = Query(None),
+    user_id: UUID | None = Query(None),
 ):
     q = select(Review)
     if festival_id is not None:
-        q = q.where(Review.festival_id == UUID(festival_id))
+        q = q.where(Review.festival_id == festival_id)
     if user_id is not None:
-        q = q.where(Review.user_id == UUID(user_id))
+        q = q.where(Review.user_id == user_id)
     q = q.order_by(Review.created_at.desc())
     rows = db.execute(q).scalars().all()
     return [orm_to_dict(r) for r in rows]
 
 
 @app.get("/reviews/{review_id}")
-def get_review(review_id: str, db: Session = Depends(get_db)):
+def get_review(review_id: UUID, db: Session = Depends(get_db)):
     row = db.execute(
-        select(Review).where(Review.id == UUID(review_id))
+        select(Review).where(Review.id == review_id)
     ).scalars().one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="Review not found")

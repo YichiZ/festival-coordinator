@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # --- Groups ---
 
@@ -131,7 +131,7 @@ class FestivalCatalog(BaseModel):
 class ReviewCreate(BaseModel):
     user_id: UUID
     festival_id: UUID
-    stars: int
+    stars: int = Field(ge=1, le=5)
     text: str | None = None
 
 
@@ -139,6 +139,6 @@ class Review(BaseModel):
     id: UUID
     user_id: UUID
     festival_id: UUID
-    stars: int
+    stars: int = Field(ge=1, le=5)
     text: str | None = None
     created_at: datetime | None = None
