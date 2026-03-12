@@ -3,7 +3,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "tsx index.ts"
+    "start": "tsx index.ts",
+    "sync:supabase": "tsx sync-supabase.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "latest",
