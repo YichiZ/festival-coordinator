@@ -1,8 +1,8 @@
 [project]
-name = "voice-agent-researcher"
+name = "festival-coordinator"
 version = "0.1.0"
-description = "Voice agent researcher"
-requires-python = ">=3.12"
+description = "Voice-based AI assistant for festival trip planning"
+requires-python = "==3.13.*"
 dependencies = [
     "pipecat-ai[anthropic,cartesia,daily,local-smart-turn-v3,runner,silero,tracing,webrtc]",
     "pipecat-ai-cli",
