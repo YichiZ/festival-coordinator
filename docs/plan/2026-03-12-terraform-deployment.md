@@ -1,6 +1,12 @@
 # Terraform Deployment Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **Required skills — STOP if any are missing:**
+> - `terraform-skill@antonbabenko` — Terraform best practices, module structure, testing strategy. Install: `/plugin install terraform-skill@antonbabenko`
+> - `terminalskills-skills-aws-cli` — AWS CLI patterns for ECR, App Runner, IAM, and Secrets Manager. Install: `/plugin install terminalskills-skills-aws-cli`
+>
+> Invoke both skills before writing or reviewing any Terraform or AWS CLI commands in this plan.
 
 **Goal:** Deploy all Festival Coordinator services to AWS using Terraform, replacing manual App Runner setup with reproducible infrastructure-as-code.
 
