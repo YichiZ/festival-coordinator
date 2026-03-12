@@ -32,4 +32,4 @@ supabase/.temp/
 command.sh
 TODO.md
 .run/
-.claude/skills/
+.claude/settings.local.json
