@@ -26,6 +26,14 @@ uv run pyright
 
 ### REST API (FastAPI, backend/)
 ```bash
+# First-time setup: apply schema + seed data
+supabase start
+supabase db reset   # runs supabase/migrations/* then supabase/seed.sql
+
+# Copy printed URL + anon key into .env:
+#   SUPABASE_URL=http://localhost:54321
+#   SUPABASE_API_KEY=<anon key>
+
 # Run the FastAPI server
 uv run fastapi dev backend/main.py
 ```
@@ -70,7 +78,28 @@ Node.js script using Stagehand (Browserbase) to scrape festival lineups. Tries A
 
 ## Environment Variables
 
-Required in `.env` (root): `ANTHROPIC_API_KEY`, `CARTESIA_API_KEY`, `SUPABASE_URL`, `SUPABASE_API_KEY`, `ENABLE_TRACING`. Optional for telephony: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`.
+Required in `.env` (root): `ANTHROPIC_API_KEY`, `CARTESIA_API_KEY`, `SUPABASE_URL`, `SUPABASE_API_KEY`, `ENABLE_TRACING`. Both the voice bot and the REST API share these Supabase credentials. Optional for telephony: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`.
+
+## Deployment (Terraform + AWS)
+
+Infrastructure is managed with Terraform in `infra/`. See full plan: `docs/plan/2026-03-12-terraform-deployment.md`.
+
+**Services:**
+- `festival-coordinator-backend` → AWS App Runner (FastAPI)
+- `festival-coordinator-bot` → AWS App Runner (voice bot)
+- Frontend → S3 + CloudFront
+
+**First-time deploy:**
+```bash
+cd infra
+terraform init
+terraform plan
+terraform apply
+```
+
+**CI/CD:** Push to `main` triggers `.github/workflows/deploy.yml` — builds Docker images, pushes to ECR, runs `terraform apply`, syncs frontend to S3.
+
+**Adding a new migration for production:** Add a file to `supabase/migrations/`, run `supabase db push` against the cloud project.
 
 ## Key Conventions
 

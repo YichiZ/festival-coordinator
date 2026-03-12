@@ -1,7 +1,5 @@
--- Festival Coordinator — canonical schema (reference copy)
--- The authoritative version used by Supabase CLI is:
---   supabase/migrations/20260101000000_initial_schema.sql
--- Keep this file in sync when adding new migrations.
+-- Festival Coordinator — initial schema
+-- Applied automatically by: supabase db reset
 
 -- ── Extensions ────────────────────────────────────────────────────────────────
 

@@ -1,16 +1,6 @@
-services:
-  postgres:
-    image: postgis/postgis:16-3.4
-    platform: linux/amd64
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: festival_coordinator
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init.sql:/docker-entrypoint-initdb.d/02-init.sql
-
-volumes:
-  postgres_data:
+# Postgres is now managed by the Supabase CLI.
+# Run `supabase start` to spin up a local Postgres + API stack, then set:
+#   SUPABASE_URL=http://localhost:54321
+#   SUPABASE_API_KEY=<anon key printed by supabase start>
+#
+# Add any other local-only services (e.g. Redis, mock Twilio) here if needed.

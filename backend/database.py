@@ -1,34 +1,21 @@
 import os
-from contextlib import contextmanager
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from supabase import Client, create_client
 
 load_dotenv(override=True)
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is required")
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_API_KEY = os.environ.get("SUPABASE_API_KEY")
 
-_engine = create_engine(DATABASE_URL)
-_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+if not SUPABASE_URL or not SUPABASE_API_KEY:
+    raise RuntimeError("SUPABASE_URL and SUPABASE_API_KEY environment variables are required")
 
-
-@contextmanager
-def get_session():
-    session = _SessionLocal()
-    try:
-        yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
+_client: Client | None = None
 
 
-def get_db():
-    """FastAPI dependency: yields a Session and closes it after the request."""
-    with get_session() as session:
-        yield session
+def get_client() -> Client:
+    global _client
+    if _client is None:
+        _client = create_client(SUPABASE_URL, SUPABASE_API_KEY)
+    return _client
