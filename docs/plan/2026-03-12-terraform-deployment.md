@@ -4,7 +4,7 @@
 >
 > **Required skills — STOP if any are missing:**
 > - `terraform-skill@antonbabenko` — Terraform best practices, module structure, testing strategy. Install: `/plugin install terraform-skill@antonbabenko`
-> - `terminalskills-skills-aws-cli` — AWS CLI patterns for ECR, App Runner, IAM, and Secrets Manager. Install: `/plugin install terminalskills-skills-aws-cli`
+> - `terminalskills-skills-aws-cli` — AWS CLI patterns for ECR, App Runner, IAM, and Secrets Manager. Already bundled in `.claude/skills/`. If missing: `npx -y @lobehub/market-cli skills install terminalskills-skills-aws-cli`
 >
 > Invoke both skills before writing or reviewing any Terraform or AWS CLI commands in this plan.
 
