@@ -1,25 +1,19 @@
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { GroupList } from "@/components/groups/group-list";
 import { CreateGroupWizard } from "@/components/wizard/create-group-wizard";
 import { listGroups } from "@/api/groups";
-import type { Group } from "@/api/types";
+import { useQuery } from "@/hooks/use-query";
 
 export function HomePage() {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
 
-  const fetchGroups = useCallback(() => {
-    setLoading(true);
-    listGroups()
-      .then(setGroups)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: groups, loading, error, refetch } = useQuery("groups", listGroups);
 
-  useEffect(() => {
-    fetchGroups();
-  }, [fetchGroups]);
+  const handleCreated = useCallback(() => {
+    setWizardOpen(false);
+    refetch();
+  }, [refetch]);
 
   return (
     <div className="space-y-6">
@@ -30,14 +24,16 @@ export function HomePage() {
 
       {loading ? (
         <p className="text-muted-foreground">Loading...</p>
+      ) : error ? (
+        <p className="text-destructive text-sm">{error.message}</p>
       ) : (
-        <GroupList groups={groups} />
+        <GroupList groups={groups ?? []} />
       )}
 
       <CreateGroupWizard
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
-        onCreated={fetchGroups}
+        onCreated={handleCreated}
       />
     </div>
   );

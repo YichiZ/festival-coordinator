@@ -17,6 +17,7 @@ export function GroupDetailPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [festivals, setFestivals] = useState<Festival[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Member dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -49,11 +50,12 @@ export function GroupDetailPage() {
   }
 
   async function handleDeleteMember(memberId: string) {
+    setDeleteError(null);
     try {
       await deleteMember(memberId);
       fetchMembers();
     } catch (err) {
-      console.error("Failed to delete member:", err);
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete member");
     }
   }
 
@@ -75,6 +77,10 @@ export function GroupDetailPage() {
         </Link>
         <h1 className="text-2xl font-bold">{group.name ?? "Unnamed Group"}</h1>
       </div>
+
+      {deleteError && (
+        <p className="text-destructive text-sm">{deleteError}</p>
+      )}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">

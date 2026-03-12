@@ -11,6 +11,7 @@ interface Props {
   onSubmit: () => void;
   onBack: () => void;
   submitting: boolean;
+  submitError?: string | null;
 }
 
 function formatDate(d: string | null) {
@@ -24,6 +25,7 @@ export function StepSelectFestivals({
   onSubmit,
   onBack,
   submitting,
+  submitError,
 }: Props) {
   const {
     catalog,
@@ -133,6 +135,10 @@ export function StepSelectFestivals({
             );
           })}
         </div>
+      )}
+
+      {submitError && (
+        <p className="text-destructive text-sm">{submitError}</p>
       )}
 
       <div className="flex gap-2">

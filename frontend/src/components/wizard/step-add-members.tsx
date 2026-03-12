@@ -43,6 +43,7 @@ export function StepAddMembers({ members, onChange, onNext, onBack }: Props) {
           placeholder="Member name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          required
         />
       </div>
       <div className="space-y-2">
@@ -52,6 +53,7 @@ export function StepAddMembers({ members, onChange, onNext, onBack }: Props) {
           placeholder="+1 555 123 4567"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          required
         />
       </div>
       <div className="space-y-2">
@@ -61,6 +63,7 @@ export function StepAddMembers({ members, onChange, onNext, onBack }: Props) {
           placeholder="City"
           value={city}
           onChange={(e) => setCity(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addMember()}
         />
       </div>
       <Button
@@ -75,7 +78,7 @@ export function StepAddMembers({ members, onChange, onNext, onBack }: Props) {
       {members.length > 0 && (
         <div className="space-y-2">
           {members.map((m, i) => (
-            <Card key={i}>
+            <Card key={`${m.name}-${m.phone}`}>
               <CardContent className="flex items-center justify-between py-2">
                 <div>
                   <p className="text-sm font-medium">{m.name}</p>

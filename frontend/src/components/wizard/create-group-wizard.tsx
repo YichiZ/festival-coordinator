@@ -28,6 +28,7 @@ export function CreateGroupWizard({ open, onClose, onCreated }: Props) {
   const [members, setMembers] = useState<DraftMember[]>([]);
   const [selectedFestivalIds, setSelectedFestivalIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Reset state when dialog opens
   useEffect(() => {
@@ -37,6 +38,7 @@ export function CreateGroupWizard({ open, onClose, onCreated }: Props) {
       setMembers([]);
       setSelectedFestivalIds([]);
       setSubmitting(false);
+      setSubmitError(null);
     }
   }, [open]);
 
@@ -85,7 +87,7 @@ export function CreateGroupWizard({ open, onClose, onCreated }: Props) {
       onCreated();
       onClose();
     } catch (err) {
-      console.error("Failed to create group:", err);
+      setSubmitError(err instanceof Error ? err.message : "Failed to create group");
     } finally {
       setSubmitting(false);
     }
@@ -120,6 +122,7 @@ export function CreateGroupWizard({ open, onClose, onCreated }: Props) {
             onSubmit={handleSubmit}
             onBack={() => setStep(1)}
             submitting={submitting}
+            submitError={submitError}
           />
         )}
       </DialogContent>

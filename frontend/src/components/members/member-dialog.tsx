@@ -35,6 +35,7 @@ export function MemberDialog({ open, onClose, onSaved, groupId, member }: Props)
   const [city, setCity] = useState("");
   const [status, setStatus] = useState("active");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -43,6 +44,7 @@ export function MemberDialog({ open, onClose, onSaved, groupId, member }: Props)
       setCity(member?.city ?? "");
       setStatus(member?.status ?? "active");
       setSubmitting(false);
+      setSubmitError(null);
     }
   }, [open, member]);
 
@@ -70,7 +72,7 @@ export function MemberDialog({ open, onClose, onSaved, groupId, member }: Props)
       onSaved();
       onClose();
     } catch (err) {
-      console.error("Failed to save member:", err);
+      setSubmitError(err instanceof Error ? err.message : "Failed to save member");
     } finally {
       setSubmitting(false);
     }
@@ -130,6 +132,10 @@ export function MemberDialog({ open, onClose, onSaved, groupId, member }: Props)
               ))}
             </select>
           </div>
+
+          {submitError && (
+            <p className="text-destructive text-sm">{submitError}</p>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
