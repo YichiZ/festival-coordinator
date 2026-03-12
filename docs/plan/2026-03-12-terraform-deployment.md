@@ -6,7 +6,7 @@
 
 **Architecture:** Terraform manages three AWS App Runner services (FastAPI backend, voice bot) plus S3+CloudFront for the React frontend. Secrets are stored in AWS Secrets Manager and injected into App Runner at runtime. Supabase (cloud) remains the database — no change needed there.
 
-**Tech Stack:** Terraform ≥ 1.7, AWS App Runner, AWS S3 + CloudFront, AWS Secrets Manager, AWS ECR (container registry), AWS IAM, Docker, GitHub Actions (CI/CD)
+**Tech Stack:** Terraform ~> 1.5 (1.5.7 via Homebrew), AWS App Runner, AWS S3 + CloudFront, AWS Secrets Manager, AWS ECR (container registry), AWS IAM, Docker, GitHub Actions (CI/CD)
 
 ---
 
@@ -18,17 +18,21 @@ All prices are AWS us-east-1 as of 2026. Assumes light/moderate usage typical fo
 
 App Runner charges for **provisioned compute** (when paused/idle) + **active compute** (while handling requests).
 
-| Mode | Rate |
-|---|---|
-| Provisioned (idle) | $0.007 / vCPU-hr · $0.0008 / GB-hr |
-| Active (handling requests) | $0.064 / vCPU-hr · $0.008 / GB-hr |
+
+| Mode                       | Rate                               |
+| -------------------------- | ---------------------------------- |
+| Provisioned (idle)         | $0.007 / vCPU-hr · $0.0008 / GB-hr |
+| Active (handling requests) | $0.064 / vCPU-hr · $0.008 / GB-hr  |
+
 
 **Backend service** (0.25 vCPU / 0.5 GB, scale-to-zero, ~2 hrs active/day):
-- Active: 2 hr × 0.25 × $0.064 + 2 hr × 0.5 × $0.008 = ~$0.04/day → **~$1.20/mo**
+
+- Active: 2 hr × 0.25 × $0.064 + 2 hr × 0.5 × $0.008 = ~~$0.04/day → **~~$1.20/mo**
 - Idle: $0 (scale-to-zero, min_size = 0)
 - **Backend total: ~$1–2/mo**
 
 **Bot service** (1 vCPU / 2 GB, scale-to-zero, low usage — only during calls):
+
 - PyTorch + Silero VAD require at least 1.5 GB RAM and meaningful CPU
 - Active during calls only: **~$3–5/mo**
 - Idle: $0 (scale-to-zero, min_size = 0)
@@ -37,12 +41,14 @@ App Runner charges for **provisioned compute** (when paused/idle) + **active com
 
 ### S3 + CloudFront (frontend)
 
-| Item | Cost |
-|---|---|
+
+| Item                           | Cost                   |
+| ------------------------------ | ---------------------- |
 | S3 storage (React build ~5 MB) | ~$0.00/mo (negligible) |
-| CloudFront — 1 GB transfer/mo | ~$0.085 |
-| CloudFront — 10K requests/mo | ~$0.01 |
-| **Frontend total** | **~$0.10/mo** |
+| CloudFront — 1 GB transfer/mo  | ~$0.085                |
+| CloudFront — 10K requests/mo   | ~$0.01                 |
+| **Frontend total**             | **~$0.10/mo**          |
+
 
 ### Secrets Manager
 
@@ -51,18 +57,20 @@ App Runner charges for **provisioned compute** (when paused/idle) + **active com
 
 ### ECR (container registry)
 
-First 500 MB/mo free. Two small images (~200 MB each) = **~$0/mo** within free tier.
+First 500 MB/mo free. Two small images (~~200 MB each) = **~~$0/mo** within free tier.
 
 ### Summary
 
-| Service | Monthly Cost |
-|---|---|
-| App Runner — backend (0.25 vCPU / 0.5 GB, scale-to-zero) | ~$1–2 |
-| App Runner — bot (1 vCPU / 2 GB, scale-to-zero) | ~$3–5 |
-| S3 + CloudFront — frontend | ~$0.10 |
-| Secrets Manager | ~$2.40 |
-| ECR | ~$0.00 |
-| **Total** | **~$7–10/mo** |
+
+| Service                                                  | Monthly Cost  |
+| -------------------------------------------------------- | ------------- |
+| App Runner — backend (0.25 vCPU / 0.5 GB, scale-to-zero) | ~$1–2         |
+| App Runner — bot (1 vCPU / 2 GB, scale-to-zero)          | ~$3–5         |
+| S3 + CloudFront — frontend                               | ~$0.10        |
+| Secrets Manager                                          | ~$2.40        |
+| ECR                                                      | ~$0.00        |
+| **Total**                                                | **~$7–10/mo** |
+
 
 ### Cost-saving options
 
@@ -117,10 +125,10 @@ backend/main.py            # Fix CORS to accept production frontend URL
 ### Task 1: Dockerfile for FastAPI backend
 
 **Files:**
+
 - Create: `Dockerfile.backend`
 - Modify: `backend/main.py` (CORS origins)
-
-- [ ] **Step 1: Create `Dockerfile.backend`**
+- [x] **Step 1: Create `Dockerfile.backend`**
 
 ```dockerfile
 FROM python:3.13-slim
@@ -133,7 +141,7 @@ EXPOSE 8000
 CMD ["uv", "run", "fastapi", "run", "backend/main.py", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-- [ ] **Step 2: Fix CORS in `backend/main.py`**
+- [x] **Step 2: Fix CORS in `backend/main.py`**
 
 Replace hardcoded `http://localhost:5173` with env-driven origins:
 
@@ -173,9 +181,9 @@ git commit -m "feat(infra): add backend Dockerfile and env-driven CORS"
 ### Task 2: Dockerfile for voice bot
 
 **Files:**
-- Create: `Dockerfile.bot`
 
-- [ ] **Step 1: Create `Dockerfile.bot`**
+- Create: `Dockerfile.bot`
+- [x] **Step 1: Create `Dockerfile.bot`**
 
 ```dockerfile
 FROM python:3.13-slim
@@ -217,11 +225,11 @@ git commit -m "feat(infra): add voice bot Dockerfile"
 ### Task 3: Secrets Manager module
 
 **Files:**
+
 - Create: `infra/modules/secrets/main.tf`
 - Create: `infra/modules/secrets/variables.tf`
 - Create: `infra/modules/secrets/outputs.tf`
-
-- [ ] **Step 1: Create `infra/modules/secrets/variables.tf`**
+- [x] **Step 1: Create `infra/modules/secrets/variables.tf`**
 
 ```hcl
 variable "env" { type = string }
@@ -231,7 +239,7 @@ variable "secrets" {
 }
 ```
 
-- [ ] **Step 2: Create `infra/modules/secrets/main.tf`**
+- [x] **Step 2: Create `infra/modules/secrets/main.tf`**
 
 ```hcl
 resource "aws_secretsmanager_secret" "app" {
@@ -246,7 +254,7 @@ resource "aws_secretsmanager_secret_version" "app" {
 }
 ```
 
-- [ ] **Step 3: Create `infra/modules/secrets/outputs.tf`**
+- [x] **Step 3: Create `infra/modules/secrets/outputs.tf`**
 
 ```hcl
 output "secret_arns" {
@@ -266,11 +274,11 @@ git commit -m "feat(infra): secrets manager terraform module"
 ### Task 4: App Runner module
 
 **Files:**
+
 - Create: `infra/modules/apprunner/main.tf`
 - Create: `infra/modules/apprunner/variables.tf`
 - Create: `infra/modules/apprunner/outputs.tf`
-
-- [ ] **Step 1: Create `infra/modules/apprunner/variables.tf`**
+- [x] **Step 1: Create `infra/modules/apprunner/variables.tf`**
 
 ```hcl
 variable "name"          { type = string }
@@ -284,7 +292,7 @@ variable "env_vars"      { type = map(string); default = {} }
 variable "secret_arns"   { type = map(string); default = {} }
 ```
 
-- [ ] **Step 2: Create `infra/modules/apprunner/main.tf`**
+- [x] **Step 2: Create `infra/modules/apprunner/main.tf`**
 
 ```hcl
 resource "aws_iam_role" "apprunner_instance" {
@@ -345,7 +353,7 @@ resource "aws_apprunner_service" "this" {
 }
 ```
 
-- [ ] **Step 3: Create `infra/modules/apprunner/outputs.tf`**
+- [x] **Step 3: Create `infra/modules/apprunner/outputs.tf`**
 
 ```hcl
 output "service_url" { value = "https://${aws_apprunner_service.this.service_url}" }
@@ -364,18 +372,18 @@ git commit -m "feat(infra): app runner terraform module"
 ### Task 5: Frontend S3 + CloudFront module
 
 **Files:**
+
 - Create: `infra/modules/frontend/main.tf`
 - Create: `infra/modules/frontend/variables.tf`
 - Create: `infra/modules/frontend/outputs.tf`
-
-- [ ] **Step 1: Create `infra/modules/frontend/variables.tf`**
+- [x] **Step 1: Create `infra/modules/frontend/variables.tf`**
 
 ```hcl
 variable "name"          { type = string }
 variable "dist_path"     { type = string; default = "../frontend/dist" }
 ```
 
-- [ ] **Step 2: Create `infra/modules/frontend/main.tf`**
+- [x] **Step 2: Create `infra/modules/frontend/main.tf`**
 
 ```hcl
 resource "aws_s3_bucket" "frontend" {
@@ -449,7 +457,7 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 ```
 
-- [ ] **Step 3: Create `infra/modules/frontend/outputs.tf`**
+- [x] **Step 3: Create `infra/modules/frontend/outputs.tf`**
 
 ```hcl
 output "cloudfront_url"  { value = "https://${aws_cloudfront_distribution.frontend.domain_name}" }
@@ -471,12 +479,12 @@ git commit -m "feat(infra): s3+cloudfront frontend terraform module"
 ### Task 6: Root Terraform module
 
 **Files:**
+
 - Create: `infra/main.tf`
 - Create: `infra/variables.tf`
 - Create: `infra/outputs.tf`
 - Create: `infra/terraform.tfvars.example`
-
-- [ ] **Step 1: Create `infra/variables.tf`**
+- [x] **Step 1: Create `infra/variables.tf`**
 
 ```hcl
 variable "aws_region"       { type = string; default = "us-east-1" }
@@ -494,11 +502,11 @@ variable "twilio_auth_token" { type = string; sensitive = true; default = "" }
 variable "twilio_number"     { type = string; default = "" }
 ```
 
-- [ ] **Step 2: Create `infra/main.tf`**
+- [x] **Step 2: Create `infra/main.tf`**
 
 ```hcl
 terraform {
-  required_version = ">= 1.7"
+  required_version = "~> 1.5"
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 5.0" }
   }
@@ -553,7 +561,7 @@ module "frontend" {
 }
 ```
 
-- [ ] **Step 3: Create `infra/outputs.tf`**
+- [x] **Step 3: Create `infra/outputs.tf`**
 
 ```hcl
 output "backend_url"  { value = module.backend.service_url }
@@ -561,7 +569,7 @@ output "bot_url"      { value = module.bot.service_url }
 output "frontend_url" { value = module.frontend.cloudfront_url }
 ```
 
-- [ ] **Step 4: Create `infra/terraform.tfvars.example`**
+- [x] **Step 4: Create `infra/terraform.tfvars.example`**
 
 ```hcl
 aws_region = "us-east-1"
@@ -572,7 +580,7 @@ env        = "production"
 # bot_image_uri     = "123456789.dkr.ecr.us-east-1.amazonaws.com/festival-bot:latest"
 ```
 
-- [ ] **Step 5: Validate Terraform config**
+- [x] **Step 5: Validate Terraform config**
 
 ```bash
 cd infra
@@ -580,7 +588,15 @@ terraform init
 terraform validate
 ```
 
-Expected: `Success! The configuration is valid.`
+Expected: `Success! The configuration is valid.` ✓ Confirmed with Terraform 1.5.7.
+
+> **Terraform skill review (2026-03-12):** Config reviewed against [antonbabenko/terraform-skill](https://github.com/antonbabenko/terraform-skill). Issues found and fixed:
+>
+> - `>= 1.7` → `~> 1.5` (1.6+ is BSL-licensed and unavailable via Homebrew; 1.5.7 is the latest open-source release)
+> - All variables now have `description` (required by skill)
+> - All outputs now have `description`
+> - `for_each` blocks now have a blank line after (resource block ordering)
+> - IAM policy now uses `count = length(var.secret_arns) > 0 ? 1 : 0` to avoid invalid `"Resource": []` when `secret_arns` is empty
 
 - [ ] **Step 6: Commit**
 
@@ -594,9 +610,9 @@ git commit -m "feat(infra): root terraform module wiring all services"
 ### Task 7: GitHub Actions CI/CD
 
 **Files:**
-- Create: `.github/workflows/deploy.yml`
 
-- [ ] **Step 1: Create `.github/workflows/deploy.yml`**
+- Create: `.github/workflows/deploy.yml`
+- [x] **Step 1: Create `.github/workflows/deploy.yml`**
 
 ```yaml
 name: Deploy
@@ -674,6 +690,7 @@ jobs:
 - [ ] **Step 2: Add required GitHub secrets**
 
 In GitHub repo → Settings → Secrets, add:
+
 - `AWS_ACCOUNT_ID`
 - `AWS_DEPLOY_ROLE_ARN`
 - `ANTHROPIC_API_KEY`
@@ -769,14 +786,16 @@ Expected: JSON array of groups from production Supabase.
 
 ## Environment Summary
 
-| Variable | Where set |
-|---|---|
-| `SUPABASE_URL` | GitHub secret → Terraform → Secrets Manager → App Runner |
-| `SUPABASE_API_KEY` | GitHub secret → Terraform → Secrets Manager → App Runner |
+
+| Variable            | Where set                                                |
+| ------------------- | -------------------------------------------------------- |
+| `SUPABASE_URL`      | GitHub secret → Terraform → Secrets Manager → App Runner |
+| `SUPABASE_API_KEY`  | GitHub secret → Terraform → Secrets Manager → App Runner |
 | `ANTHROPIC_API_KEY` | GitHub secret → Terraform → Secrets Manager → App Runner |
-| `CARTESIA_API_KEY` | GitHub secret → Terraform → Secrets Manager → App Runner |
-| `TWILIO_*` | GitHub secret → Terraform → Secrets Manager → App Runner |
-| `CORS_ORIGINS` | Terraform env_var (CloudFront URL) → App Runner |
+| `CARTESIA_API_KEY`  | GitHub secret → Terraform → Secrets Manager → App Runner |
+| `TWILIO_*`          | GitHub secret → Terraform → Secrets Manager → App Runner |
+| `CORS_ORIGINS`      | Terraform env_var (CloudFront URL) → App Runner          |
+
 
 ## Post-MVP Improvements
 
@@ -785,3 +804,4 @@ Expected: JSON array of groups from production Supabase.
 - Add staging environment (`env = "staging"`)
 - Set up custom domain with ACM + Route 53
 - Enable App Runner auto-scaling configuration
+
