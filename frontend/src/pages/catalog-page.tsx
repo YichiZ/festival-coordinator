@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,34 +9,35 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CatalogSearchForm } from "@/components/catalog/catalog-search-form";
-import { searchFestivalCatalog } from "@/api/festival-catalog";
-import type { FestivalCatalogEntry } from "@/api/types";
+import {
+  listFestivalCatalog,
+  searchFestivalCatalog,
+  type SearchFestivalCatalogParams,
+} from "@/api/festival-catalog";
+import { useFestivalSearch } from "@/hooks/use-festival-search";
 import { formatDate, formatPrice } from "@/lib/utils";
 
 export function CatalogPage() {
-  const [catalog, setCatalog] = useState<FestivalCatalogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchName, setSearchName] = useState("");
-  const [searchLat, setSearchLat] = useState("");
-  const [searchLon, setSearchLon] = useState("");
-
-  function runSearch() {
-    setLoading(true);
-    const params: { name?: string; latitude?: number; longitude?: number } = {};
-    if (searchName.trim()) params.name = searchName.trim();
-    const lat = parseFloat(searchLat);
-    const lon = parseFloat(searchLon);
-    if (!Number.isNaN(lat)) params.latitude = lat;
-    if (!Number.isNaN(lon)) params.longitude = lon;
-    searchFestivalCatalog(params)
-      .then(setCatalog)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    searchFestivalCatalog({}).then(setCatalog).finally(() => setLoading(false));
+  const fetchFn = useCallback((params: SearchFestivalCatalogParams) => {
+    const hasFilters =
+      params.name != null ||
+      params.latitude != null ||
+      params.longitude != null;
+    return hasFilters ? searchFestivalCatalog(params) : listFestivalCatalog();
   }, []);
+
+  const {
+    catalog,
+    loading,
+    error,
+    searchName,
+    setSearchName,
+    searchLat,
+    setSearchLat,
+    searchLon,
+    setSearchLon,
+    runSearch,
+  } = useFestivalSearch(fetchFn);
 
   return (
     <div className="space-y-6">
@@ -61,6 +62,8 @@ export function CatalogPage() {
 
       {loading ? (
         <p className="text-muted-foreground">Loading festivals...</p>
+      ) : error ? (
+        <p className="text-destructive text-sm">{error}</p>
       ) : catalog.length === 0 ? (
         <p className="text-muted-foreground">No festivals match your search.</p>
       ) : (

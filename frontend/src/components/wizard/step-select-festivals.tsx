@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { CatalogSearchForm } from "@/components/catalog/catalog-search-form";
-import { searchFestivalCatalog } from "@/api/festival-catalog";
+import { useFestivalSearch } from "@/hooks/use-festival-search";
 import type { FestivalCatalogEntry } from "@/api/types";
 import { formatDate } from "@/lib/utils";
 
@@ -22,29 +21,18 @@ export function StepSelectFestivals({
   onBack,
   submitting,
 }: Props) {
-  const [catalog, setCatalog] = useState<FestivalCatalogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchName, setSearchName] = useState("");
-  const [searchLat, setSearchLat] = useState("");
-  const [searchLon, setSearchLon] = useState("");
-
-  function runSearch() {
-    setLoading(true);
-    const params: { name?: string; latitude?: number; longitude?: number } = {};
-    if (searchName.trim()) params.name = searchName.trim();
-    const lat = parseFloat(searchLat);
-    const lon = parseFloat(searchLon);
-    if (!Number.isNaN(lat)) params.latitude = lat;
-    if (!Number.isNaN(lon)) params.longitude = lon;
-    searchFestivalCatalog(params)
-      .then(setCatalog)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }
-
-  useEffect(() => {
-    searchFestivalCatalog({}).then(setCatalog).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  const {
+    catalog,
+    loading,
+    error,
+    searchName,
+    setSearchName,
+    searchLat,
+    setSearchLat,
+    searchLon,
+    setSearchLon,
+    runSearch,
+  } = useFestivalSearch();
 
   function toggle(id: string) {
     onChange(
@@ -69,11 +57,13 @@ export function StepSelectFestivals({
 
       {loading ? (
         <p className="text-muted-foreground">Loading festivals...</p>
+      ) : error ? (
+        <p className="text-destructive text-sm">{error}</p>
       ) : catalog.length === 0 ? (
         <p className="text-muted-foreground">No festivals match your search.</p>
       ) : (
         <div className="space-y-3">
-          {catalog.map((f) => {
+          {catalog.map((f: FestivalCatalogEntry) => {
             const dateRange = [formatDate(f.dates_start), formatDate(f.dates_end)]
               .filter(Boolean)
               .join(" – ");

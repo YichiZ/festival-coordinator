@@ -78,23 +78,6 @@ create table reviews (
   created_at timestamptz default now()
 );
 
-create or replace function execute_readonly_query(query text)
-returns jsonb
-language plpgsql
-security definer
-as $$
-declare
-  result jsonb;
-begin
-  if not (trim(lower(query)) like 'select%') then
-    raise exception 'Only SELECT queries are allowed';
-  end if;
-  execute 'select coalesce(jsonb_agg(row_to_json(t)), ''[]''::jsonb) from (' || query || ') t'
-    into result;
-  return result;
-end;
-$$;
-
 -- Festival catalog seed
 insert into festival_catalog (name, location, dates_start, dates_end, ticket_price, on_sale_date, latitude, longitude) values
   ('Coachella', 'Indio, CA', '2026-04-10', '2026-04-12', 549, '2026-01-10', 33.6810, -116.2374),
@@ -114,7 +97,7 @@ insert into groups (id, name, description) values
   ('aaaaaaaa-0001-4000-a000-000000000003', 'Solo Starters',       'New members not yet in a group');
 
 insert into members (id, group_id, name, city, phone, status) values
-  ('bbbbbbbb-0001-4000-b000-000000000001', 'aaaaaaaa-0001-4000-a000-000000000001', 'Yichi',      'San Francisco, CA', '+14156403871', 'active'),
+  ('bbbbbbbb-0001-4000-b000-000000000001', 'aaaaaaaa-0001-4000-a000-000000000001', 'Yichi',      'San Francisco, CA', '+14155550100', 'active'),
   ('bbbbbbbb-0001-4000-b000-000000000002', 'aaaaaaaa-0001-4000-a000-000000000001', 'Alex',       'San Francisco, CA', '+14155550101', 'active'),
   ('bbbbbbbb-0001-4000-b000-000000000003', 'aaaaaaaa-0001-4000-a000-000000000001', 'Maria',      'Oakland, CA',       '+15105550102', 'active'),
   ('bbbbbbbb-0001-4000-b000-000000000004', 'aaaaaaaa-0001-4000-a000-000000000001', 'Jordan',     'San Jose, CA',      '+14085550103', 'pending'),
@@ -139,7 +122,7 @@ insert into calls (id, group_id, started_at, ended_at, summary, from_number) val
   ('eeeeeeee-0001-4000-e000-000000000001', 'aaaaaaaa-0001-4000-a000-000000000001',
     '2026-02-01 18:30:00+00', '2026-02-01 18:45:00+00',
     '- Group decided on "Bay Area Bassheads" as the crew name\n- Yichi, Alex, and Maria are in the group\n- Jordan might join but hasn''t committed yet (pending)\n- Haven''t picked a festival yet — need to explore options',
-    '+14156403871'),
+    '+14155550100'),
   ('eeeeeeee-0001-4000-e000-000000000002', 'aaaaaaaa-0001-4000-a000-000000000002',
     '2026-02-03 20:00:00+00', '2026-02-03 20:20:00+00',
     '- East Coast Explorers locked in for Governors Ball\n- Jack and Jacqueline buying tickets this week\n- Steve interested in Bonnaroo as a road trip\n- Priya dropped out (marked inactive)',

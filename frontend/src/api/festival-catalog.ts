@@ -14,10 +14,12 @@ export interface SearchFestivalCatalogParams {
 export function searchFestivalCatalog(params: SearchFestivalCatalogParams = {}) {
   const search = new URLSearchParams();
   if (params.name?.trim()) search.set("name", params.name.trim());
-  if (params.latitude != null && !Number.isNaN(params.latitude))
+  const hasLat = params.latitude != null && !Number.isNaN(params.latitude);
+  const hasLon = params.longitude != null && !Number.isNaN(params.longitude);
+  if (hasLat && hasLon) {
     search.set("latitude", String(params.latitude));
-  if (params.longitude != null && !Number.isNaN(params.longitude))
     search.set("longitude", String(params.longitude));
+  }
   const qs = search.toString();
   return apiFetch<FestivalCatalogEntry[]>(
     `/festival-catalog/search${qs ? `?${qs}` : ""}`
