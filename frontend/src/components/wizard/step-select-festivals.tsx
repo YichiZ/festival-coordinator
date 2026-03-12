@@ -1,9 +1,10 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CatalogSearchForm } from "@/components/catalog/catalog-search-form";
 import { useFestivalSearch } from "@/hooks/use-festival-search";
 import type { FestivalCatalogEntry } from "@/api/types";
+import { formatDate } from "@/lib/utils";
 
 interface Props {
   selected: string[];
@@ -11,11 +12,6 @@ interface Props {
   onSubmit: () => void;
   onBack: () => void;
   submitting: boolean;
-}
-
-function formatDate(d: string | null) {
-  if (!d) return null;
-  return new Date(d + "T00:00:00").toLocaleDateString();
 }
 
 export function StepSelectFestivals({
@@ -48,55 +44,16 @@ export function StepSelectFestivals({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2 rounded-md border p-3">
-        <p className="text-sm font-medium">Search catalog</p>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <div className="space-y-1">
-            <Label htmlFor="search-name" className="text-xs">
-              Name
-            </Label>
-            <Input
-              id="search-name"
-              type="text"
-              placeholder="e.g. Coachella"
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="search-lat" className="text-xs">
-              Latitude
-            </Label>
-            <Input
-              id="search-lat"
-              type="number"
-              step="any"
-              placeholder="e.g. 40.7"
-              value={searchLat}
-              onChange={(e) => setSearchLat(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="search-lon" className="text-xs">
-              Longitude
-            </Label>
-            <Input
-              id="search-lon"
-              type="number"
-              step="any"
-              placeholder="e.g. -74"
-              value={searchLon}
-              onChange={(e) => setSearchLon(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            />
-          </div>
-        </div>
-        <Button type="button" variant="secondary" size="sm" onClick={runSearch}>
-          Search
-        </Button>
-      </div>
+      <CatalogSearchForm
+        searchName={searchName}
+        setSearchName={setSearchName}
+        searchLat={searchLat}
+        setSearchLat={setSearchLat}
+        searchLon={searchLon}
+        setSearchLon={setSearchLon}
+        onSearch={runSearch}
+        idPrefix="wizard"
+      />
 
       {loading ? (
         <p className="text-muted-foreground">Loading festivals...</p>

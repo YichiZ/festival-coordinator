@@ -16,9 +16,6 @@ def _uuid_pk() -> Mapped[uuid.UUID]:
     return mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
 
-def _uuid_fk(name: str, *, ondelete: str = "cascade") -> Mapped[uuid.UUID]:
-    return mapped_column(ForeignKey(name, ondelete=ondelete), type_=UUID(as_uuid=True))
-
 
 class Group(Base):
     __tablename__ = "groups"
@@ -140,7 +137,8 @@ class Review(Base):
 
 def orm_to_dict(row: Base, *, exclude: set[str] | None = None) -> dict[str, Any]:
     """Turn an ORM model instance into a dict for JSON response (e.g. UUID/date/datetime as str)."""
-    exclude = exclude or set()
+    if exclude is None:
+        exclude = set()
     d: dict[str, Any] = {}
     for c in row.__table__.columns:
         if c.name in exclude:
