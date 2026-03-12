@@ -1,3 +1,4 @@
+import os
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Query
@@ -17,9 +18,11 @@ from backend.models import (
 
 app = FastAPI(title="Festival Coordinator API")
 
+_origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
