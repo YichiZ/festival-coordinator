@@ -110,7 +110,7 @@ Node.js script using Stagehand (Browserbase) to scrape festival lineups. Tries A
 
 **Bot (root `.env`):** `ANTHROPIC_API_KEY`, `CARTESIA_API_KEY`, `SUPABASE_URL`, `SUPABASE_API_KEY`, `ENABLE_TRACING`. Optional for telephony: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`.
 
-**REST API (root `.env`):** `DATABASE_URL` (PostgreSQL connection string, e.g. `postgresql+psycopg://user:pass@localhost:5432/postgres`).
+**REST API (root `.env`):** `DATABASE_URL` (PostgreSQL connection string, e.g. `postgresql+psycopg://postgres:postgres@localhost:5432/festival_coordinator`).
 
 **Frontend (`.env` in `frontend/`):** `VITE_API_URL` (optional, defaults to `http://localhost:8000`).
 
