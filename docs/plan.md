@@ -119,6 +119,156 @@ The API base URL defaults to `http://localhost:8000` inside `frontend/src/api/cl
 
 ---
 
+## F0. Live Active Calls Display (WebSocket)
+
+Show currently ongoing calls in the frontend in real-time via a WebSocket connection.
+
+### Why Postgres LISTEN/NOTIFY
+
+The bot (`db.py`) and the FastAPI API are separate processes sharing one Postgres database. LISTEN/NOTIFY is built into Postgres (zero new infrastructure), and `psycopg[binary]` (v3) is already a dependency with async support. The bot's existing `start_call()` and `end_call_record()` writes automatically fire NOTIFY via a DB trigger — no changes needed to `bot.py` or `tools.py`. SQLAlchemy handles CRUD; a single dedicated `psycopg.AsyncConnection` handles the pub/sub channel.
+
+### Schema changes
+
+**`migrations/004_active_calls_notify.sql`**
+
+```sql
+CREATE OR REPLACE FUNCTION notify_call_change()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF (TG_OP = 'INSERT') THEN
+    PERFORM pg_notify('call_changes', json_build_object(
+      'event', 'call_started',
+      'call_id', NEW.id,
+      'group_id', NEW.group_id,
+      'from_number', NEW.from_number,
+      'started_at', NEW.started_at
+    )::text);
+  ELSIF (TG_OP = 'UPDATE' AND NEW.ended_at IS NOT NULL AND OLD.ended_at IS NULL) THEN
+    PERFORM pg_notify('call_changes', json_build_object(
+      'event', 'call_ended',
+      'call_id', NEW.id
+    )::text);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER calls_notify_insert
+  AFTER INSERT ON calls FOR EACH ROW EXECUTE FUNCTION notify_call_change();
+
+CREATE TRIGGER calls_notify_update
+  AFTER UPDATE ON calls FOR EACH ROW EXECUTE FUNCTION notify_call_change();
+```
+
+No new columns needed — `ended_at IS NULL` is the live-call condition.
+
+### WebSocket message protocol
+
+```jsonc
+// On connect: current snapshot
+{ "type": "snapshot", "calls": [ActiveCall, ...] }
+
+// When bot starts a call (INSERT trigger)
+{ "type": "call_started", "call": ActiveCall }
+
+// When bot ends a call (UPDATE trigger sets ended_at)
+{ "type": "call_ended", "call_id": "uuid" }
+
+// ActiveCall shape
+{
+  "call_id": "uuid",
+  "group_id": "uuid",
+  "group_name": "Bay Area Bassheads",
+  "from_number": "+14155550100",
+  "member_name": "Yichi",       // null if caller unknown
+  "started_at": "2026-03-12T18:30:00Z"
+}
+```
+
+### New backend files
+
+**`backend/active_calls.py`**
+- Module-level `set[asyncio.Queue]` subscriber registry
+- `start_listener()`: opens `psycopg.AsyncConnection`, runs `LISTEN call_changes`, dispatches notifications to all queues; started in a FastAPI `lifespan` context
+- `subscribe()` / `unsubscribe()`: return/release a queue per WS client
+- `get_active_calls_snapshot()`: SQLAlchemy query joining `calls + groups + members` (by `phone = from_number`), filters `ended_at IS NULL AND started_at > NOW() - INTERVAL '2 hours'`
+- `_enrich_notification()`: SQLAlchemy PK/phone lookups to add `group_name` and `member_name` to raw trigger payload
+
+**`backend/ws_router.py`**
+- `GET /ws/active-calls` WebSocket endpoint
+- On connect: send snapshot, subscribe to queue, forward messages to client
+- On disconnect: unsubscribe and clean up
+
+### Changes to existing backend files
+
+- `backend/main.py`: add `lifespan` context manager to start/stop the listener; `app.include_router(ws_router)`
+- `backend/models.py`: add `ActiveCall` Pydantic model
+
+### New frontend files
+
+| File | Purpose |
+|------|---------|
+| `frontend/src/api/active-calls.ts` | `ActiveCall` + `WsMessage` TypeScript types, WS URL helper |
+| `frontend/src/hooks/use-active-calls.ts` | WS lifecycle, immutable state updates, exponential backoff reconnect |
+| `frontend/src/hooks/use-elapsed-time.ts` | Ticks every second, returns `"1:42"` formatted elapsed string |
+| `frontend/src/components/calls/active-call-card.tsx` | Single call row: group name, caller, member name, elapsed time |
+| `frontend/src/components/calls/active-calls-panel.tsx` | Panel with pulsing green dot when calls active, maps over cards |
+
+### Changes to existing frontend files
+
+- `frontend/src/pages/home-page.tsx`: render `<ActiveCallsPanel>` above the groups grid
+
+### Implementation order
+
+1. Write and apply `migrations/004_active_calls_notify.sql`
+2. `backend/active_calls.py` (listener + subscriber registry)
+3. `backend/ws_router.py` (WebSocket endpoint)
+4. Update `backend/main.py` (lifespan + include router)
+5. Add `ActiveCall` to `backend/models.py`
+6. `frontend/src/api/active-calls.ts`
+7. `frontend/src/hooks/use-elapsed-time.ts`
+8. `frontend/src/hooks/use-active-calls.ts`
+9. `frontend/src/components/calls/active-call-card.tsx`
+10. `frontend/src/components/calls/active-calls-panel.tsx`
+11. Update `frontend/src/pages/home-page.tsx`
+
+### Edge cases
+
+| Case | Mitigation |
+|------|-----------|
+| Bot crash — `ended_at` never set | Snapshot query filters `started_at > NOW() - 2 hours` |
+| Network blip — client reconnects | Fresh `snapshot` on reconnect overwrites stale state |
+| Call started before LISTEN established | Initial snapshot on WS connect catches it |
+| Postgres NOTIFY 8KB payload limit | Trigger payload is ~5 small fields, well within limit |
+| `started_at` server default on INSERT | Trigger fires AFTER INSERT, default already applied |
+
+### How to test
+
+**Backend unit** — `tests/unit/test_active_calls.py`
+- Mock `psycopg.AsyncConnection`, assert `LISTEN call_changes` issued on startup
+- Test `_enrich_notification()` with mocked SQLAlchemy session; assert group_name and member_name populated
+- Test `get_active_calls_snapshot()` filters out stale calls (`started_at` > 2h ago)
+
+**Backend integration** — `tests/integration/test_ws_active_calls.py`
+- Use `httpx[ws]` + FastAPI `TestClient` with a real Postgres (testcontainers)
+- Insert a call row, connect WS, assert `snapshot` contains it
+- Update `ended_at`, assert `call_ended` message received
+- Connect two clients simultaneously, insert a call, assert both receive `call_started`
+
+**Frontend unit** — `src/hooks/use-active-calls.test.ts`
+- Mock `WebSocket` globally; simulate `snapshot`, `call_started`, `call_ended` messages
+- Assert state is updated immutably (new array references on each change)
+- Assert `call_ended` removes the correct call without mutating others
+
+**Frontend unit** — `src/hooks/use-elapsed-time.test.ts`
+- Use `vi.useFakeTimers()`, advance by 65 seconds, assert output is `"1:05"`
+
+**E2E** — `e2e/active-calls.spec.ts`
+- Start the dev stack, insert a call row directly via API, open home page, assert the panel shows the call
+- Update `ended_at` via API, assert the panel removes the call without page refresh
+
+---
+
 ## Product Features
 
 ### P1 — High value, fits existing architecture
