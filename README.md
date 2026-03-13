@@ -146,6 +146,26 @@ OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic <base64-encoded public:secret>
 
 Sign up at [langfuse.com](https://langfuse.com/) and create a project to get your keys. The base64 header value is `base64(public_key:secret_key)`.
 
+## Deployment
+
+All services are deployed to AWS and managed with Terraform in `infra/`.
+
+| Service | URL |
+|---------|-----|
+| Frontend | https://d3jcnwi5h28nlo.cloudfront.net |
+| Backend API | https://utpejmbpk7.us-east-1.awsapprunner.com |
+| Voice Bot | https://9ppxkrcmy4.us-east-1.awsapprunner.com |
+
+**Infrastructure:**
+- Backend + bot → AWS App Runner (containerized, auto-deploy on ECR push)
+- Frontend → S3 + CloudFront
+- Secrets → AWS Secrets Manager (injected into App Runner at runtime)
+- CI/CD → GitHub Actions (push to `main` builds images, runs `terraform apply`, syncs frontend)
+
+See `docs/plan/2026-03-12-terraform-deployment.md` for the full deployment plan and `docs/retro/2026-03-12-terraform-deployment.md` for lessons learned.
+
+**Monthly cost: ~$10.35** (backend ~$1.57, bot ~$6.28, Secrets Manager ~$2.40, CloudFront ~$0.10).
+
 ## Lineup Scraper
 
 The `browserbase-client/` directory contains a Node.js scraper built with [Stagehand](https://github.com/browserbase/stagehand) (Browserbase) that extracts festival lineups from official websites. It uses an AI agent to navigate lineup pages and extract artist/stage/time data into CSV and JSON.
