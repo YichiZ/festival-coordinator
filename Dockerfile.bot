@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM --platform=linux/amd64 python:3.13-slim
 WORKDIR /app
 
 # ffmpeg required by pydub for audio processing
@@ -10,6 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
-COPY bot.py tools.py db.py ./
+COPY bot.py tools.py db.py schema.sql ./
 EXPOSE 8080
-CMD ["uv", "run", "python", "bot.py", "-t", "twilio"]
+CMD ["uv", "run", "python", "bot.py", "-t", "twilio", "--host", "0.0.0.0", "--port", "8080"]
