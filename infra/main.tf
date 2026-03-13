@@ -49,6 +49,5 @@ module "bot" {
   port        = 8080
   cpu         = "1024" # 1 vCPU — PyTorch + Silero VAD + smart turn need real CPU
   memory      = "2048" # 2 GB — PyTorch model loading requires ~1.5 GB+
-  min_size    = 0
   secret_arns = module.secrets.secret_arns
 }

@@ -27,9 +27,9 @@ variable "memory" {
 }
 
 variable "min_size" {
-  description = "Minimum number of instances (0 = scale-to-zero)"
+  description = "Minimum number of instances (App Runner requires >= 1)"
   type        = number
-  default     = 0
+  default     = 1
 }
 
 variable "max_size" {
