@@ -59,34 +59,33 @@ SUPABASE_API_KEY=<anon key>
 
 ### 3. Voice Agent
 
-**Local dev (Daily WebRTC — no phone needed):**
-
 ```bash
 uv sync
-uv run python bot.py
 ```
 
-**Twilio telephony (receive real phone calls):**
+**Twilio telephony (production):**
 
 1. Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_NUMBER` in your `.env`.
-2. Expose your local server with ngrok:
-   ```bash
-   ngrok http 7860
-   ```
-3. In the [Twilio Console](https://console.twilio.com/), create a TwiML Bin with:
+2. In the [Twilio Console](https://console.twilio.com/), create a TwiML Bin with:
    ```xml
    <?xml version="1.0" encoding="UTF-8"?>
    <Response>
      <Connect>
-       <Stream url="wss://<your-ngrok-url>/ws" />
+       <Stream url="wss://<your-server-url>/ws" />
      </Connect>
    </Response>
    ```
    Then assign the bin to your Twilio phone number under **Voice Configuration**.
-4. Start the bot with the Twilio transport:
+3. Start the bot:
    ```bash
    uv run python bot.py -t twilio
    ```
+
+**Daily WebRTC (local dev — no phone needed):**
+
+```bash
+uv run python bot.py
+```
 
 ### 4. REST API
 
