@@ -4,6 +4,29 @@ Retrospective on deploying Festival Coordinator to AWS using the plan in `docs/p
 
 ---
 
+## Actual Cost (us-east-1, 2026)
+
+Based on deployed configuration: backend (0.25 vCPU / 0.5 GB), bot (1 vCPU / 2 GB), both min_size=1.
+
+| Service | Monthly |
+|---------|---------|
+| App Runner — backend (0.25 vCPU / 0.5 GB, always-on) | ~$1.57 |
+| App Runner — bot (1 vCPU / 2 GB, always-on) | ~$6.28 |
+| S3 + CloudFront — frontend | ~$0.10 |
+| Secrets Manager (6 secrets) | ~$2.40 |
+| ECR (2 repos, within free tier) | ~$0.00 |
+| **Total** | **~$10.35/mo** |
+
+The plan estimated ~$7–10/mo assuming scale-to-zero (`min_size = 0`), which App Runner doesn't support. With the required `min_size = 1`, idle provisioned compute is always billed.
+
+**To cut costs:** Pause the bot when not in use (~$6.28/mo → $0 while paused):
+```bash
+aws apprunner pause-service --service-arn arn:aws:apprunner:us-east-1:865037033530:service/festival-coordinator-bot-production/084f5d192a924ea7bca6e532f603e506
+aws apprunner resume-service --service-arn arn:aws:apprunner:us-east-1:865037033530:service/festival-coordinator-bot-production/084f5d192a924ea7bca6e532f603e506
+```
+
+---
+
 ## What Went Wrong (and Why)
 
 ### 1. `uv sync` failed inside Docker — missing `[tool.uv] package = false`
