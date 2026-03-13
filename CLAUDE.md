@@ -82,22 +82,37 @@ Required in `.env` (root): `ANTHROPIC_API_KEY`, `CARTESIA_API_KEY`, `SUPABASE_UR
 
 ## Deployment (Terraform + AWS)
 
-Infrastructure is managed with Terraform in `infra/`. See full plan: `docs/plan/2026-03-12-terraform-deployment.md`.
+Infrastructure is managed with Terraform in `infra/`. See full plan: `docs/plan/2026-03-12-terraform-deployment.md`. See lessons learned: `docs/retro/2026-03-12-terraform-deployment.md`.
 
 **Services:**
-- `festival-coordinator-backend` → AWS App Runner (FastAPI)
-- `festival-coordinator-bot` → AWS App Runner (voice bot)
-- Frontend → S3 + CloudFront
+- `festival-coordinator-backend` → AWS App Runner (FastAPI) — `utpejmbpk7.us-east-1.awsapprunner.com`
+- `festival-coordinator-bot` → AWS App Runner (voice bot) — `9ppxkrcmy4.us-east-1.awsapprunner.com`
+- Frontend → S3 + CloudFront — `d3jcnwi5h28nlo.cloudfront.net`
 
-**First-time deploy:**
+**Running terraform apply (local):**
 ```bash
+# AWS SSO tokens expire in ~15 min — always re-export immediately before apply
+eval $(aws configure export-credentials --format env)
+
 cd infra
-terraform init
-terraform plan
-terraform apply
+export TF_VAR_backend_image_uri="865037033530.dkr.ecr.us-east-1.amazonaws.com/festival-backend:latest"
+export TF_VAR_bot_image_uri="865037033530.dkr.ecr.us-east-1.amazonaws.com/festival-bot:latest"
+# remaining TF_VAR_* secrets pulled from Secrets Manager or set manually
+terraform apply -auto-approve
 ```
 
+**If terraform apply fails mid-run (token expiry or partial apply):**
+1. Check actual AWS status: `aws apprunner list-services`
+2. Re-adopt drifted resources: `terraform import <address> <arn>`
+3. Clear taint on healthy resources: `terraform untaint <address>`
+4. Re-export credentials and re-apply
+
 **CI/CD:** Push to `main` triggers `.github/workflows/deploy.yml` — builds Docker images, pushes to ECR, runs `terraform apply`, syncs frontend to S3.
+
+**Docker builds — Apple Silicon note:** Always use `--platform linux/amd64` when building for App Runner:
+```bash
+docker build --platform linux/amd64 -f Dockerfile.backend -t festival-backend:local .
+```
 
 **Adding a new migration for production:** Add a file to `supabase/migrations/`, run `supabase db push` against the cloud project.
 
