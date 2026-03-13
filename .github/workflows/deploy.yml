@@ -1,0 +1,70 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        run: |
+          docker build -f Dockerfile.backend \
+            -t $ECR_REGISTRY/festival-backend:${{ github.sha }} \
+            -t $ECR_REGISTRY/festival-backend:latest .
+          docker push $ECR_REGISTRY/festival-backend:${{ github.sha }}
+          docker push $ECR_REGISTRY/festival-backend:latest
+
+      - name: Build and push bot image
+        run: |
+          docker build -f Dockerfile.bot \
+            -t $ECR_REGISTRY/festival-bot:${{ github.sha }} \
+            -t $ECR_REGISTRY/festival-bot:latest .
+          docker push $ECR_REGISTRY/festival-bot:${{ github.sha }}
+          docker push $ECR_REGISTRY/festival-bot:latest
+
+      - name: Build frontend
+        run: |
+          cd frontend && npm ci && npm run build
+
+      - name: Terraform apply
+        working-directory: infra
+        env:
+          TF_VAR_backend_image_uri: ${{ env.ECR_REGISTRY }}/festival-backend:${{ github.sha }}
+          TF_VAR_bot_image_uri: ${{ env.ECR_REGISTRY }}/festival-bot:${{ github.sha }}
+          TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          TF_VAR_cartesia_api_key: ${{ secrets.CARTESIA_API_KEY }}
+          TF_VAR_supabase_url: ${{ secrets.SUPABASE_URL }}
+          TF_VAR_supabase_api_key: ${{ secrets.SUPABASE_API_KEY }}
+          TF_VAR_twilio_account_sid: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TF_VAR_twilio_auth_token: ${{ secrets.TWILIO_AUTH_TOKEN }}
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Deploy frontend to S3
+        run: |
+          BUCKET=$(cd infra && terraform output -raw s3_bucket_name)
+          DIST_ID=$(cd infra && terraform output -raw distribution_id)
+          aws s3 sync frontend/dist s3://$BUCKET --delete
+          aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"

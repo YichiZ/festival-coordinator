@@ -1,11 +1,10 @@
+import os
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, text
-from sqlalchemy.orm import Session, selectinload
 
-from backend.database import get_db
+from backend.database import get_client
 from backend.models import (
     ArtistCreate,
     CallCreate,
@@ -16,22 +15,14 @@ from backend.models import (
     MemberUpdate,
     ReviewCreate,
 )
-from backend.orm_models import (
-    Artist,
-    Call,
-    Festival,
-    FestivalCatalog,
-    Group,
-    Member,
-    Review,
-    orm_to_dict,
-)
 
 app = FastAPI(title="Festival Coordinator API")
 
+_origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,250 +35,226 @@ _STATUS_ORDER = {"active": 0, "pending": 1, "inactive": 2}
 
 
 @app.get("/groups")
-def list_groups(db: Session = Depends(get_db)):
-    rows = db.execute(select(Group).order_by(Group.created_at.desc())).scalars().all()
-    return [orm_to_dict(r) for r in rows]
+def list_groups():
+    client = get_client()
+    result = client.table("groups").select("*").order("created_at", desc=True).execute()
+    return result.data
 
 
 @app.get("/groups/{group_id}")
-def get_group(group_id: UUID, db: Session = Depends(get_db)):
-    row = db.execute(select(Group).where(Group.id == group_id)).scalars().one_or_none()
-    if not row:
+def get_group(group_id: UUID):
+    client = get_client()
+    result = client.table("groups").select("*").eq("id", str(group_id)).execute()
+    if not result.data:
         raise HTTPException(status_code=404, detail="Group not found")
-    return orm_to_dict(row)
+    return result.data[0]
 
 
 @app.post("/groups", status_code=201)
-def create_group(body: GroupCreate, db: Session = Depends(get_db)):
+def create_group(body: GroupCreate):
+    client = get_client()
     data = body.model_dump(exclude_none=True)
-    row = Group(**data)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return orm_to_dict(row)
+    result = client.table("groups").insert(data).execute()
+    return result.data[0]
 
 
 @app.get("/groups/{group_id}/members")
-def list_group_members(group_id: UUID, db: Session = Depends(get_db)):
-    rows = (
-        db.execute(
-            select(Member).where(Member.group_id == group_id).order_by(Member.name)
-        )
-        .scalars()
-        .all()
+def list_group_members(group_id: UUID):
+    client = get_client()
+    result = (
+        client.table("members")
+        .select("*")
+        .eq("group_id", str(group_id))
+        .order("name")
+        .execute()
     )
-    out = [orm_to_dict(r) for r in rows]
-    return sorted(out, key=lambda m: (_STATUS_ORDER.get(m.get("status", ""), 9), m.get("name", "")))
+    rows = result.data
+    return sorted(
+        rows,
+        key=lambda m: (_STATUS_ORDER.get(m.get("status", ""), 9), m.get("name", "")),
+    )
 
 
 @app.get("/groups/{group_id}/festivals")
-def list_group_festivals(group_id: UUID, db: Session = Depends(get_db)):
-    rows = (
-        db.execute(
-            select(Festival)
-            .where(Festival.group_id == group_id)
-            .options(selectinload(Festival.artists))
-            .order_by(Festival.dates_start)
-        )
-        .scalars()
-        .all()
+def list_group_festivals(group_id: UUID):
+    client = get_client()
+    result = (
+        client.table("festivals")
+        .select("*, artists(*)")
+        .eq("group_id", str(group_id))
+        .order("dates_start")
+        .execute()
     )
-    return [
-        {**orm_to_dict(f), "artists": [orm_to_dict(a) for a in f.artists]}
-        for f in rows
-    ]
+    return result.data
 
 
 # ── Members ──────────────────────────────────────────────────────────────────
 
 
 @app.get("/members")
-def list_members(db: Session = Depends(get_db)):
-    rows = db.execute(select(Member)).scalars().all()
-    return [orm_to_dict(r) for r in rows]
+def list_members():
+    client = get_client()
+    result = client.table("members").select("*").execute()
+    return result.data
 
 
 @app.get("/members/{member_id}")
-def get_member(member_id: UUID, db: Session = Depends(get_db)):
-    row = db.execute(select(Member).where(Member.id == member_id)).scalars().one_or_none()
-    if not row:
+def get_member(member_id: UUID):
+    client = get_client()
+    result = client.table("members").select("*").eq("id", str(member_id)).execute()
+    if not result.data:
         raise HTTPException(status_code=404, detail="Member not found")
-    return orm_to_dict(row)
+    return result.data[0]
 
 
 @app.post("/members", status_code=201)
-def create_member(body: MemberCreate, db: Session = Depends(get_db)):
+def create_member(body: MemberCreate):
+    client = get_client()
     data = body.model_dump(exclude_none=True)
-    data["group_id"] = UUID(str(data["group_id"]))
-    row = Member(**data)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return orm_to_dict(row)
+    data["group_id"] = str(data["group_id"])
+    result = client.table("members").insert(data).execute()
+    return result.data[0]
 
 
 @app.patch("/members/{member_id}")
-def update_member(member_id: UUID, body: MemberUpdate, db: Session = Depends(get_db)):
+def update_member(member_id: UUID, body: MemberUpdate):
+    client = get_client()
     data = body.model_dump(exclude_none=True)
     if not data:
         raise HTTPException(status_code=400, detail="No fields to update")
-    row = db.execute(select(Member).where(Member.id == member_id)).scalars().one_or_none()
-    if not row:
+    check = client.table("members").select("id").eq("id", str(member_id)).execute()
+    if not check.data:
         raise HTTPException(status_code=404, detail="Member not found")
-    for k, v in data.items():
-        setattr(row, k, v)
-    db.commit()
-    db.refresh(row)
-    return orm_to_dict(row)
+    result = client.table("members").update(data).eq("id", str(member_id)).execute()
+    return result.data[0]
 
 
 @app.delete("/members/{member_id}", status_code=204)
-def delete_member(member_id: UUID, db: Session = Depends(get_db)):
-    row = db.execute(select(Member).where(Member.id == member_id)).scalars().one_or_none()
-    if not row:
+def delete_member(member_id: UUID):
+    client = get_client()
+    check = client.table("members").select("id").eq("id", str(member_id)).execute()
+    if not check.data:
         raise HTTPException(status_code=404, detail="Member not found")
-    db.delete(row)
-    db.commit()
+    client.table("members").delete().eq("id", str(member_id)).execute()
 
 
 # ── Calls ────────────────────────────────────────────────────────────────────
 
 
 @app.get("/calls")
-def list_calls(db: Session = Depends(get_db)):
-    rows = db.execute(select(Call).order_by(Call.started_at.desc())).scalars().all()
-    return [orm_to_dict(r) for r in rows]
+def list_calls():
+    client = get_client()
+    result = client.table("calls").select("*").order("started_at", desc=True).execute()
+    return result.data
 
 
 @app.get("/calls/{call_id}")
-def get_call(call_id: UUID, db: Session = Depends(get_db)):
-    row = db.execute(select(Call).where(Call.id == call_id)).scalars().one_or_none()
-    if not row:
+def get_call(call_id: UUID):
+    client = get_client()
+    result = client.table("calls").select("*").eq("id", str(call_id)).execute()
+    if not result.data:
         raise HTTPException(status_code=404, detail="Call not found")
-    return orm_to_dict(row)
+    return result.data[0]
 
 
 @app.post("/calls", status_code=201)
-def create_call(body: CallCreate, db: Session = Depends(get_db)):
+def create_call(body: CallCreate):
+    client = get_client()
     data = body.model_dump(exclude_none=True)
-    data["group_id"] = UUID(str(data["group_id"]))
-    row = Call(**data)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return orm_to_dict(row)
+    data["group_id"] = str(data["group_id"])
+    result = client.table("calls").insert(data).execute()
+    return result.data[0]
 
 
 # ── Festivals ────────────────────────────────────────────────────────────────
 
 
 @app.get("/festivals")
-def list_festivals(db: Session = Depends(get_db)):
-    rows = db.execute(select(Festival).order_by(Festival.dates_start)).scalars().all()
-    return [orm_to_dict(r) for r in rows]
+def list_festivals():
+    client = get_client()
+    result = client.table("festivals").select("*").order("dates_start").execute()
+    return result.data
 
 
 @app.get("/festivals/{festival_id}")
-def get_festival(festival_id: UUID, db: Session = Depends(get_db)):
-    row = db.execute(
-        select(Festival).where(Festival.id == festival_id)
-    ).scalars().one_or_none()
-    if not row:
+def get_festival(festival_id: UUID):
+    client = get_client()
+    result = client.table("festivals").select("*").eq("id", str(festival_id)).execute()
+    if not result.data:
         raise HTTPException(status_code=404, detail="Festival not found")
-    return orm_to_dict(row)
+    return result.data[0]
 
 
 @app.post("/festivals", status_code=201)
-def create_festival(body: FestivalCreate, db: Session = Depends(get_db)):
+def create_festival(body: FestivalCreate):
+    client = get_client()
     data = body.model_dump(exclude_none=True)
-    data["group_id"] = UUID(str(data["group_id"]))
-    row = Festival(**data)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return orm_to_dict(row)
+    data["group_id"] = str(data["group_id"])
+    result = client.table("festivals").insert(data).execute()
+    return result.data[0]
 
 
 # ── Artists ───────────────────────────────────────────────────────────────────
 
 
 @app.get("/artists")
-def list_artists(db: Session = Depends(get_db)):
-    rows = db.execute(select(Artist)).scalars().all()
-    return [orm_to_dict(r) for r in rows]
+def list_artists():
+    client = get_client()
+    result = client.table("artists").select("*").execute()
+    return result.data
 
 
 @app.get("/artists/{artist_id}")
-def get_artist(artist_id: UUID, db: Session = Depends(get_db)):
-    row = db.execute(
-        select(Artist).where(Artist.id == artist_id)
-    ).scalars().one_or_none()
-    if not row:
+def get_artist(artist_id: UUID):
+    client = get_client()
+    result = client.table("artists").select("*").eq("id", str(artist_id)).execute()
+    if not result.data:
         raise HTTPException(status_code=404, detail="Artist not found")
-    return orm_to_dict(row)
+    return result.data[0]
 
 
 @app.post("/artists", status_code=201)
-def create_artist(body: ArtistCreate, db: Session = Depends(get_db)):
+def create_artist(body: ArtistCreate):
+    client = get_client()
     data = body.model_dump(exclude_none=True)
-    data["festival_id"] = UUID(str(data["festival_id"]))
-    row = Artist(**data)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return orm_to_dict(row)
+    data["festival_id"] = str(data["festival_id"])
+    result = client.table("artists").insert(data).execute()
+    return result.data[0]
 
 
 # ── Festival Catalog ─────────────────────────────────────────────────────────
 
 
 @app.get("/festival-catalog")
-def list_festival_catalog(db: Session = Depends(get_db)):
-    rows = db.execute(
-        select(FestivalCatalog).order_by(FestivalCatalog.dates_start)
-    ).scalars().all()
-    return [orm_to_dict(r) for r in rows]
+def list_festival_catalog():
+    client = get_client()
+    result = client.table("festival_catalog").select("*").order("dates_start").execute()
+    return result.data
 
 
 @app.get("/festival-catalog/search")
 def search_festival_catalog(
-    db: Session = Depends(get_db),
     name: str | None = Query(None, description="Filter by name (partial, case-insensitive)"),
     latitude: float | None = Query(None, description="Latitude for distance ordering"),
     longitude: float | None = Query(None, description="Longitude for distance ordering"),
 ):
-    q = select(FestivalCatalog)
+    client = get_client()
+    params: dict = {}
     if name is not None and name.strip():
-        q = q.where(FestivalCatalog.name.ilike(f"%{name.strip()}%"))
+        params["p_name"] = name.strip()
     if latitude is not None and longitude is not None:
-        q = q.where(
-            FestivalCatalog.latitude.isnot(None),
-            FestivalCatalog.longitude.isnot(None),
-        ).order_by(
-            text(
-                "ST_Distance("
-                "ST_MakePoint(festival_catalog.longitude, festival_catalog.latitude)::geography, "
-                "ST_MakePoint(:lon, :lat)::geography"
-                ")"
-            )
-        )
-        rows = db.execute(q, {"lat": latitude, "lon": longitude}).scalars().all()
-    else:
-        q = q.order_by(FestivalCatalog.dates_start)
-        rows = db.execute(q).scalars().all()
-    return [orm_to_dict(r) for r in rows]
+        params["p_lat"] = latitude
+        params["p_lon"] = longitude
+    result = client.rpc("search_festival_catalog", params).execute()
+    return result.data
 
 
 @app.post("/festival-catalog", status_code=201)
-def create_festival_catalog_entry(
-    body: FestivalCatalogCreate, db: Session = Depends(get_db)
-):
+def create_festival_catalog_entry(body: FestivalCatalogCreate):
+    client = get_client()
     data = body.model_dump(exclude_none=True)
-    row = FestivalCatalog(**data)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return orm_to_dict(row)
+    result = client.table("festival_catalog").insert(data).execute()
+    return result.data[0]
 
 
 # ── Reviews ───────────────────────────────────────────────────────────────────
@@ -295,37 +262,33 @@ def create_festival_catalog_entry(
 
 @app.get("/reviews")
 def list_reviews(
-    db: Session = Depends(get_db),
     festival_id: UUID | None = Query(None),
     user_id: UUID | None = Query(None),
 ):
-    q = select(Review)
+    client = get_client()
+    q = client.table("reviews").select("*")
     if festival_id is not None:
-        q = q.where(Review.festival_id == festival_id)
+        q = q.eq("festival_id", str(festival_id))
     if user_id is not None:
-        q = q.where(Review.user_id == user_id)
-    q = q.order_by(Review.created_at.desc())
-    rows = db.execute(q).scalars().all()
-    return [orm_to_dict(r) for r in rows]
+        q = q.eq("user_id", str(user_id))
+    result = q.order("created_at", desc=True).execute()
+    return result.data
 
 
 @app.get("/reviews/{review_id}")
-def get_review(review_id: UUID, db: Session = Depends(get_db)):
-    row = db.execute(
-        select(Review).where(Review.id == review_id)
-    ).scalars().one_or_none()
-    if not row:
+def get_review(review_id: UUID):
+    client = get_client()
+    result = client.table("reviews").select("*").eq("id", str(review_id)).execute()
+    if not result.data:
         raise HTTPException(status_code=404, detail="Review not found")
-    return orm_to_dict(row)
+    return result.data[0]
 
 
 @app.post("/reviews", status_code=201)
-def create_review(body: ReviewCreate, db: Session = Depends(get_db)):
+def create_review(body: ReviewCreate):
+    client = get_client()
     data = body.model_dump(exclude_none=True)
-    data["user_id"] = UUID(str(data["user_id"]))
-    data["festival_id"] = UUID(str(data["festival_id"]))
-    row = Review(**data)
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return orm_to_dict(row)
+    data["user_id"] = str(data["user_id"])
+    data["festival_id"] = str(data["festival_id"])
+    result = client.table("reviews").insert(data).execute()
+    return result.data[0]

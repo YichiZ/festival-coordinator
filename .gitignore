@@ -1,11 +1,33 @@
+# Python
 .venv/
-node_modules/
 __pycache__/
 *.pyc
-.env
+*.pyo
 
-command.sh
-.DS_Store
-TODO.md
+# Node
+node_modules/
 frontend/dist/
+
+# Environment
+.env
+.env.local
+
+# Terraform
+infra/.terraform/
+infra/terraform.tfstate
+infra/terraform.tfstate*.backup
+infra/terraform.tfvars
+*.tfvars
+!*.tfvars.example
+
+# Supabase
+supabase/.temp/
+
+# macOS
+.DS_Store
+
+# Misc
+command.sh
+TODO.md
 .run/
+.claude/settings.local.json

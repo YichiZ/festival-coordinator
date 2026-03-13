@@ -1,0 +1,6 @@
+aws_region = "us-east-1"
+env        = "production"
+
+# Set these via TF_VAR_* environment variables — do not commit real values
+# backend_image_uri = "123456789.dkr.ecr.us-east-1.amazonaws.com/festival-backend:latest"
+# bot_image_uri     = "123456789.dkr.ecr.us-east-1.amazonaws.com/festival-bot:latest"
